@@ -1,0 +1,16 @@
+{
+  "name": "flinkout",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @flinkout/api\" \"npm run dev -w @flinkout/web\"",
+    "build": "npm run build -w @flinkout/api && npm run build -w @flinkout/web",
+    "test": "npm run test -w @flinkout/api && npm run test -w @flinkout/web",
+    "db:generate": "npm run db:generate -w @flinkout/api",
+    "db:migrate": "npm run db:migrate -w @flinkout/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

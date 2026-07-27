@@ -1,0 +1,5 @@
+'use client';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+const nav = [{ href: '/', label: 'Home', icon: '⌂' }, { href: '/explore', label: 'Explore', icon: '⌕' }, { href: '/record', label: 'Record', icon: '●', record: true }, { href: '/map', label: 'Maps', icon: '⌖' }, { href: '/profile', label: 'Profile', icon: '◉' }];
+export function AppShell({ children }: { children: React.ReactNode }) { const path = usePathname(); if (path.startsWith('/login') || path.startsWith('/register')) return <main className="auth">{children}</main>; return <div className="layout"><nav className="nav" aria-label="Primary navigation"><Link className="brand" href="/"><span className="brand-mark">F</span> Flinkout</Link><div className="nav-links">{nav.map(item => <Link className={item.record ? 'record' : ''} key={item.href} href={item.href} aria-current={path === item.href ? 'page' : undefined}><span aria-hidden>{item.icon}</span><span>{item.label}</span></Link>)}</div><p className="nav-foot">Move together, safely.</p></nav><main className="main">{children}</main></div>; }

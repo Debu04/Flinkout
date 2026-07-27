@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum FollowStatus {
+  FOLLOWING
+}
+
+enum ProfileVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+enum ActivityType {
+  WALK
+  RUN
+  RIDE
+  HIKE
+}
+
+enum ActivityVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique @db.VarChar(254)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  username     String    @unique @db.VarChar(30)
+  profile      Profile?
+  sessions     Session[]
+  following    Follow[]  @relation("following")
+  followers    Follow[]  @relation("followers")
+  activities   Activity[]
+  reactions    ActivityReaction[]
+  comments     ActivityComment[]
+  liveActivities LiveActivity[]
+  liveJoins      LiveActivityJoin[]
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model LiveActivity {
+  id            String             @id @default(cuid())
+  userId        String             @map("user_id")
+  type          ActivityType
+  visibility    ActivityVisibility @default(FOLLOWERS)
+  latitude      Float
+  longitude     Float
+  durationS     Int                @default(0) @map("duration_s")
+  distanceM     Int                @default(0) @map("distance_m")
+  active        Boolean            @default(true)
+  startedAt     DateTime           @default(now()) @map("started_at")
+  lastUpdatedAt DateTime           @updatedAt @map("last_updated_at")
+  endedAt       DateTime?          @map("ended_at")
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joins         LiveActivityJoin[]
+
+  @@index([userId, active])
+  @@index([active, visibility, latitude, longitude])
+  @@map("live_activities")
+}
+
+model LiveActivityJoin {
+  liveActivityId String       @map("live_activity_id")
+  userId         String       @map("user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  liveActivity   LiveActivity @relation(fields: [liveActivityId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([liveActivityId, userId])
+  @@index([userId, createdAt])
+  @@map("live_activity_joins")
+}
+
+model ActivityHeatCell {
+  gridKey       String   @id @map("grid_key") @db.VarChar(32)
+  latitude      Float
+  longitude     Float
+  activityCount Int      @default(0) @map("activity_count")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([latitude, longitude])
+  @@index([activityCount])
+  @@map("activity_heat_cells")
+}
+
+model Activity {
+  id         String             @id @default(cuid())
+  userId     String             @map("user_id")
+  clientId   String             @map("client_id") @db.Char(36)
+  type       ActivityType
+  visibility ActivityVisibility @default(PRIVATE)
+  startedAt  DateTime           @map("started_at")
+  endedAt    DateTime?          @map("ended_at")
+  durationS  Int                @default(0) @map("duration_s")
+  distanceM  Int                @default(0) @map("distance_m")
+  startLat   Float?             @map("start_lat")
+  startLng   Float?             @map("start_lng")
+  route      Json?
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactions  ActivityReaction[]
+  comments   ActivityComment[]
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  @@index([userId, startedAt])
+  @@index([visibility, startedAt])
+  @@index([visibility, startLat, startLng])
+  @@unique([userId, clientId])
+  @@map("activities")
+}
+
+model ActivityReaction {
+  activityId String   @map("activity_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([activityId, userId])
+  @@index([userId, createdAt])
+  @@map("activity_reactions")
+}
+
+model ActivityComment {
+  id         String   @id @default(cuid())
+  activityId String   @map("activity_id")
+  userId     String   @map("user_id")
+  body       String   @db.VarChar(500)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([activityId, createdAt])
+  @@index([userId, createdAt])
+  @@map("activity_comments")
+}
+
+model Profile {
+  id                 String            @id @default(cuid())
+  userId             String            @unique @map("user_id")
+  displayName        String            @map("display_name") @db.VarChar(60)
+  bio                String?           @db.VarChar(280)
+  photoUrl           String?           @map("photo_url") @db.VarChar(2048)
+  profileVisibility  ProfileVisibility @default(PUBLIC) @map("profile_visibility")
+  routeVisibility    ProfileVisibility @default(PRIVATE) @map("route_visibility")
+  discoverable       Boolean           @default(true)
+  discoveryLat       Float?            @map("discovery_lat")
+  discoveryLng       Float?            @map("discovery_lng")
+  discoveryUpdatedAt DateTime?         @map("discovery_updated_at")
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  @@index([profileVisibility, discoverable])
+  @@index([discoverable, discoveryLat, discoveryLng])
+  @@map("profiles")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  userAgent String?  @map("user_agent") @db.VarChar(512)
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Follow {
+  followerId  String       @map("follower_id")
+  followingId String       @map("following_id")
+  status      FollowStatus @default(FOLLOWING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  follower    User         @relation("following", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User         @relation("followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId, createdAt])
+  @@map("follows")
+}
