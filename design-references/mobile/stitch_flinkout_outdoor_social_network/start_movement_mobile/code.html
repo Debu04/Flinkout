@@ -1,0 +1,206 @@
+<!DOCTYPE html><html class="light" lang="en" style="width: 390px; height: 884px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Flinkout | Start Movement</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#1e477b",
+                    "primary-fixed": "#c8eadf",
+                    "on-primary-fixed": "#01201a",
+                    "background": "#f9f9f8",
+                    "outline-variant": "#c1c8c4",
+                    "surface-container-high": "#e7e8e7",
+                    "outline": "#717976",
+                    "error": "#ba1a1a",
+                    "surface-variant": "#e1e3e2",
+                    "primary-container": "#2d4b43",
+                    "on-tertiary-fixed-variant": "#832600",
+                    "on-secondary-container": "#284f83",
+                    "surface-container": "#edeeed",
+                    "on-tertiary-fixed": "#390c00",
+                    "on-secondary-fixed": "#001c3b",
+                    "inverse-primary": "#adcec3",
+                    "surface-tint": "#46645c",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f3f4f3",
+                    "secondary-fixed-dim": "#a7c8ff",
+                    "secondary-fixed": "#d5e3ff",
+                    "inverse-surface": "#2e3131",
+                    "on-primary-container": "#99bab0",
+                    "secondary": "#395f94",
+                    "primary-fixed-dim": "#adcec3",
+                    "inverse-on-surface": "#f0f1f0",
+                    "on-surface": "#191c1c",
+                    "surface-dim": "#d9dad9",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-container": "#ff9976",
+                    "tertiary-fixed": "#ffdbd0",
+                    "secondary-container": "#9ec2fe",
+                    "on-surface-variant": "#414846",
+                    "tertiary-container": "#812600",
+                    "on-error-container": "#93000a",
+                    "tertiary": "#5b1800",
+                    "surface-bright": "#f9f9f8",
+                    "surface": "#f9f9f8",
+                    "primary": "#16342d",
+                    "on-primary-fixed-variant": "#2e4c44",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "surface-container-highest": "#e1e3e2",
+                    "on-background": "#191c1c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "lg": "40px",
+                    "base": "8px",
+                    "xl": "64px",
+                    "sm": "12px",
+                    "gutter": "16px",
+                    "container-max": "1200px",
+                    "xs": "4px",
+                    "md": "24px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "label-caps": ["Space Grotesk"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "data-mono": ["Space Grotesk"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: contain;
+        }
+        .glass-card {
+            background: rgba(249, 249, 248, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .activity-btn.active {
+            background-color: #16342d;
+            color: #ffffff;
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(22, 52, 45, 0.3);
+        }
+        .map-bg {
+            filter: saturate(0.8) contrast(0.9);
+        }
+        .progress-bar-fill {
+            transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md selection:bg-primary-fixed selection:text-on-primary-fixed overflow-hidden">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm h-16 flex justify-between items-center px-gutter"><div class="flex items-center gap-sm">
+<button class="p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-extrabold text-primary tracking-tight">Flinkout</h1>
+</div>
+<div class="flex items-center gap-sm">
+<button class="relative p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary">notifications</span>
+<span class="absolute top-2 right-2 w-2.5 h-2.5 bg-error border-2 border-surface rounded-full"></span>
+</button>
+<div class="w-10 h-10 rounded-full border-2 border-primary-container overflow-hidden active:scale-95 transition-transform cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A close-up professional profile portrait of a smiling young explorer wearing outdoor gear. The background is a soft-focus mountain landscape at sunrise, using warm, natural golden lighting. The aesthetic is clean, modern, and high-fidelity, matching a premium outdoor community app interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfB2OaNpqXtQ1KQEMFmPcnzaVN9AqExaxEwo84uZYGUhWbbRNVfrrezo_H-QUBPpa5CBDvdm4SoSWcove6QouUNsTk12K3aIJbKxJ_cXu83M1cB_kObQABxDQYq5cbvISZFULzNVkFcsfB15oHq8y3YsEKWp4h92EUorSXzfx1GXs6d4zH4APPG7GFJ5u3g_hzsotnwJNcrT4YA6g9RXSM3AEYZ7r-Rp2fL_YGscsSqNEYOWDsipbgOwbLs7h1_GTIT9riBpo5gbUT">
+</div>
+</div></header>
+<!-- Map Background Canvas -->
+<main class="relative h-screen w-full pt-16 pb-20">
+
+<!-- Content Overlay -->
+<div class="relative z-10 h-full flex flex-col justify-end p-gutter gap-md">
+<!-- Activity Selector Card -->
+<div class="glass-card rounded-xl p-md shadow-lg border border-outline-variant/30 flex flex-col gap-md"><header class="flex justify-between items-center mb-2"><div class="flex items-center gap-sm"><h1 class="font-headline-md text-headline-md font-extrabold text-primary tracking-tight">Flinkout</h1></div><div class="flex items-center gap-sm"><button class="relative p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all"><span class="material-symbols-outlined text-primary">notifications</span><span class="absolute top-2 right-2 w-2.5 h-2.5 bg-error border-2 border-surface rounded-full"></span></button><div class="w-10 h-10 rounded-full border-2 border-primary-container overflow-hidden active:scale-95 transition-transform cursor-pointer"></div></div></header><div class="grid grid-cols-4 gap-base" id="activity-selector"><button class="activity-btn active flex flex-col items-center gap-xs p-base rounded-lg transition-all duration-200 border border-transparent" data-activity="Walk"><div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-highest/20"><span class="material-symbols-outlined text-[28px]">directions_walk</span></div><span class="font-label-caps text-label-caps">Walk</span></button><button class="activity-btn flex flex-col items-center gap-xs p-base rounded-lg transition-all duration-200 border border-transparent text-on-surface-variant hover:bg-surface-container-high" data-activity="Run"><div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-highest/20"><span class="material-symbols-outlined text-[28px]">directions_run</span></div><span class="font-label-caps text-label-caps">Run</span></button><button class="activity-btn flex flex-col items-center gap-xs p-base rounded-lg transition-all duration-200 border border-transparent text-on-surface-variant hover:bg-surface-container-high" data-activity="Cycle"><div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-highest/20"><span class="material-symbols-outlined text-[28px]">directions_bike</span></div><span class="font-label-caps text-label-caps">Cycle</span></button><button class="activity-btn flex flex-col items-center gap-xs p-base rounded-lg transition-all duration-200 border border-transparent text-on-surface-variant hover:bg-surface-container-high" data-activity="Hike"><div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-highest/20"><span class="material-symbols-outlined text-[28px]">terrain</span></div><span class="font-label-caps text-label-caps">Hike</span></button></div><div class="bg-surface-container-low rounded-lg p-base border border-outline-variant/20"><div class="flex justify-between items-center mb-2"><span class="font-label-caps text-on-surface-variant">Today's Goal</span><span class="font-data-mono text-primary">6,400 / 8,000 steps</span></div><div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden"><div class="h-full bg-primary progress-bar-fill" style="width: 80%"></div></div></div><div class="flex items-center justify-between p-2 bg-surface-container-low rounded-lg border border-outline-variant/20"><div class="flex items-center gap-sm"><span class="material-symbols-outlined text-primary">sensors</span><span class="font-body-md font-semibold">Go Live?</span></div><div class="relative inline-flex items-center cursor-pointer"><input type="checkbox" class="sr-only peer"><div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div></div></div><button class="w-full py-4 bg-primary text-on-primary rounded-lg font-headline-md text-headline-md shadow-lg active:scale-[0.98] transition-transform flex items-center justify-center gap-sm group mt-2"><span class="">Start Movement</span><span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span></button></div>
+<!-- Primary Action -->
+
+</div>
+</main>
+<!-- Bottom Navigation Bar (Contextual) -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-lg shadow-[0_-4px_12px_rgba(0,0,0,0.05)] flex justify-around items-center h-20 px-4">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-caps text-[10px]">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">search</span><span class="font-label-caps text-[10px]">Search</span></a>
+<a class="flex flex-col items-center justify-center text-primary bg-primary-container/30 rounded-xl px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">map</span>
+<span class="font-label-caps text-[10px]">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">mail</span><span class="font-label-caps text-[10px]">Messages</span></a>
+</nav>
+<script>
+        document.querySelectorAll('.activity-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.activity-btn').forEach(b => {
+                    b.classList.remove('active', 'text-white');
+                    b.classList.add('text-on-surface-variant');
+                });
+                btn.classList.add('active');
+                btn.classList.remove('text-on-surface-variant');
+            });
+        });
+
+        // Simple haptic feedback simulation
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(5);
+                }
+            });
+        });
+    </script>
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>

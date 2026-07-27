@@ -1,0 +1,325 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Flinkout - Messages</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Fonts: Space Grotesk & Be Vietnam Pro -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Be+Vietnam+Pro:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#edeeed",
+                        "error-container": "#ffdad6",
+                        "surface-bright": "#f9f9f8",
+                        "on-tertiary-container": "#ff9976",
+                        "secondary": "#395f94",
+                        "on-secondary-container": "#284f83",
+                        "primary-container": "#2d4b43",
+                        "surface-container-low": "#f3f4f3",
+                        "surface-container-high": "#e7e8e7",
+                        "on-primary-container": "#99bab0",
+                        "tertiary-container": "#812600",
+                        "surface-tint": "#46645c",
+                        "on-secondary-fixed-variant": "#1e477b",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#2e3131",
+                        "outline-variant": "#c1c8c4",
+                        "tertiary": "#5b1800",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e3e2",
+                        "on-tertiary-fixed-variant": "#832600",
+                        "surface-variant": "#e1e3e2",
+                        "on-primary-fixed-variant": "#2e4c44",
+                        "secondary-fixed-dim": "#a7c8ff",
+                        "on-background": "#191c1c",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "primary-fixed": "#c8eadf",
+                        "on-surface": "#191c1c",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#d9dad9",
+                        "secondary-fixed": "#d5e3ff",
+                        "inverse-on-surface": "#f0f1f0",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface-variant": "#414846",
+                        "tertiary-fixed": "#ffdbd0",
+                        "surface": "#f9f9f8",
+                        "on-tertiary-fixed": "#390c00",
+                        "primary": "#16342d",
+                        "outline": "#717976",
+                        "on-primary-fixed": "#01201a",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed": "#001c3b",
+                        "background": "#f9f9f8",
+                        "inverse-primary": "#adcec3",
+                        "secondary-container": "#9ec2fe",
+                        "primary-fixed-dim": "#adcec3",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "64px",
+                        "xs": "4px",
+                        "gutter": "16px",
+                        "sm": "12px",
+                        "container-max": "1200px",
+                        "md": "24px",
+                        "base": "8px",
+                        "lg": "40px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Space Grotesk"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "display-lg": ["Be Vietnam Pro"],
+                        "data-mono": ["Space Grotesk"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            user-select: none;
+        }
+        body {
+            background-color: #f9f9f8;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .active-tab-indicator {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md dark:bg-surface-container-highest/80 shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter max-w-container-max mx-auto h-16">
+<div class="flex items-center gap-base"><button class="md:hidden p-base text-on-surface-variant active:scale-95 transition-transform"><span class="material-symbols-outlined">menu</span></button>
+<span class="text-headline-md font-headline-md font-black text-primary dark:text-primary-fixed">Flinkout</span>
+</div>
+<div class="hidden md:flex gap-md items-center h-full">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200 font-body-md text-body-md" href="#">Feed</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200 font-body-md text-body-md" href="#">Discover</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200 font-body-md text-body-md" href="#">Record</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md" href="#">Messages</a>
+</div>
+<div class="flex items-center gap-sm">
+<button class="active:scale-95 transition-transform p-base text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A clean, minimalist portrait of a modern outdoor explorer wearing techwear, high-key lighting, soft white studio background, vibrant and welcoming atmosphere with hints of forest green accents in the clothing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjufSLVT5PW5__g1SGH1ljNos3DK09tjyJ--zSKOZZaW8jZkXdBufZziNByJuipoj3DOynxUqzYWq7wrCHcas7C6CPPxtDrXBuJ3DUfMuO2JXzqqQ-xQBltZ--88qD866EAGyykh0VlFdkFZs0ofa2aN7fvZzytwgrdWn1fyvXbjIaskQxnIGyyEAirvTFWlgqdqe4vEdtK8i9lfIxUMaa8opYlx2McfZMBYTo91y4zBv3uu9v7Qmdjy5YqxdYKlQfZGLZres4cLaq">
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-20 pb-32 px-gutter max-w-container-max mx-auto">
+<!-- Segmented Control (Tabs) -->
+<div class="flex p-1 bg-surface-container-high rounded-xl mb-md">
+<button class="flex-1 py-2 text-center rounded-lg font-label-caps text-label-caps transition-all bg-surface text-primary shadow-sm" id="tab-chats" onclick="switchTab('chats')">
+                Chats
+            </button>
+<button class="flex-1 py-2 text-center rounded-lg font-label-caps text-label-caps transition-all text-on-surface-variant" id="tab-groups" onclick="switchTab('groups')">
+                Groups
+            </button>
+</div>
+<section class="space-y-sm" id="chat-list">
+<!-- Active Session Group -->
+<div class="bg-primary-container text-on-primary-container p-md rounded-xl shadow-md border border-primary/10 relative overflow-hidden group active:scale-[0.98] transition-transform">
+<!-- Atmospheric Background Shader Placeholder -->
+<div class="absolute inset-0 opacity-10 pointer-events-none">
+
+</div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-base">
+<div>
+<span class="font-label-caps text-[10px] uppercase tracking-wider opacity-80 flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+                                Live Walk Session
+                            </span>
+<h3 class="font-headline-md text-headline-md leading-tight mt-1 text-white">Morning Harbor Loop Chat</h3>
+</div>
+<span class="font-label-caps text-[12px] text-white/70">Now</span>
+</div>
+<div class="flex items-center gap-base mt-md bg-white/10 p-sm rounded-lg backdrop-blur-sm">
+<div class="flex -space-x-2 shrink-0">
+<div class="w-8 h-8 rounded-full border-2 border-primary-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up face of a smiling man with a beard, outdoors during a hike, wearing a green cap, natural lighting, Flinkout trailside aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_8ya9LeftqO0Kgjdu3B2GUDZo7r33WMIVqyE9WIfl7t2Z2I4ix09cXdFj1mXbQXZLJIr4RfTvATSmPeSsI_htddAdSZwJcp8CV41ZS7iB5Pr0hNmoylcTVxmcwcrNGVlgHy3EF5_K0x-TbxUOdzrIyc3ucOX6dhCxU_YqpeSJA_hASOTfFr7u626FvCyBJ5N0U484mfaBC-p4TgcjzP3Botr5KvVcyOF-euPLnrVNdRRwgn3E39kKBHvrke_Rglx4hvvOhvT1lgbQ">
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-primary-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of a young woman with curly hair, vibrant natural lighting, wearing athletic gear, outdoor background, high-end lifestyle photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQ-hioZF9u6RQx6hxtjj6FWFPbZbp20IrT5ivgBXWBlDPf0XxDD9cjfc7k7eIMFA0ciXbFfEf0CVlvi1kz22eYlXr3ctVZkqGsGZSXsj_6h7mlOOc5bm7i1VRskgMkXfGstzMp-MDeBo7BcUFfmYs9WY2RnOSjBmvx7IZUCy13miRSFIiGYYfswOsQJMa82_gYpbl6S3LcFL-jhR4Sfaysz9exeyqJ6DKasHqhHqyPvIOGO9ZbE4sB6Fb3ecR6Nw9BCp_fCkFLvOLr">
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-primary-container bg-surface-container-high flex items-center justify-center text-[10px] font-bold text-primary">
+                                +12
+                            </div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-white font-body-md truncate">Just passing the 2km mark!</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Individual Chats List -->
+<div class="mt-lg">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-base px-2">Recent Messages</h4>
+<div class="space-y-xs">
+<!-- Marcus Rivera -->
+<div class="flex items-center gap-md p-md bg-surface rounded-xl hover:bg-surface-container-low transition-colors group cursor-pointer border border-transparent active:scale-[0.99]">
+<div class="relative shrink-0">
+<div class="w-14 h-14 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Professional profile photo of Marcus, a Latino man in his 30s, wearing a modern zip-up jacket, soft outdoor depth of field, warm sunrise lighting, high quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6orDCO4H-mSMBRwOIf4TcdRBTDaaDgz5cFJnJSj6JEGIDeXpam_Gv59hz8eljg6-Yct_6Fd-7iQ2eDnWcDjcuGGj-Q4EnCaBjzimeRytKlT9Hd8WDJrgpc1jQZepPnEWIQE_hGaNB_0W48MW3cHbov6X8eGwq-46ySxhTRk-TkE73pd62GstCRClGdefWpXBrWFYM4QAmT_gtO199wQjnnZ6An2hSlLbbn34BeIm-GaCGxl5YmUo5MExX4ENUgGjTMGi-hCYVJZC_">
+</div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-primary border-2 border-surface rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<h5 class="font-headline-md text-body-lg font-bold truncate">Marcus Rivera</h5>
+<span class="font-label-caps text-[12px] text-primary font-bold">2m ago</span>
+</div>
+<p class="font-body-md text-on-surface truncate pr-4">See you at the trailhead at 8?</p>
+</div>
+<div class="shrink-0">
+<div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+</div>
+</div>
+<!-- Elena Rodriguez -->
+<div class="flex items-center gap-md p-md bg-surface rounded-xl hover:bg-surface-container-low transition-colors group cursor-pointer border border-transparent active:scale-[0.99]">
+<div class="shrink-0">
+<div class="w-14 h-14 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Candid portrait of Elena, a middle-aged woman with glasses and a bright smile, wearing a forest green scarf, natural lighting, clean high-end community aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaiZbNkIzNTK_3dMrnwGFcUYKyCd2mqUbutdHMLr0yj16RSkPxuAxSm6px3RuhCjVSZJ9WRcBVH3np0RJfJB4FkeNFioJb2vdd4MOGupuqoBoN-N7_x33z5p19pNgZu9B4gssK0bj-kcxtgCCAZGI8ui3Yi97PyszIKBMKCjCleVBpa1np4GRTHttuC_bJJNqGiL-SngHLd3Ez6uqt3XCQMntxtYawSmRvgLHEzpTqdzB3C4F3acl-llXxImv0--aeeHi3HSUzX20L">
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<h5 class="font-headline-md text-body-lg font-bold truncate">Elena Rodriguez</h5>
+<span class="font-label-caps text-[12px] text-on-surface-variant">1h ago</span>
+</div>
+<p class="font-body-md text-on-surface-variant truncate">Great pace today! 🔥</p>
+</div>
+</div>
+<!-- Julian Chen -->
+<div class="flex items-center gap-md p-md bg-surface rounded-xl hover:bg-surface-container-low transition-colors group cursor-pointer border border-transparent active:scale-[0.99]">
+<div class="shrink-0">
+<div class="w-14 h-14 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Minimalist portrait of Julian, an Asian man with short hair, wearing a sleek black exercise shirt, soft lighting, modern tactile aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYxq4cSg3XYbs9FhvolsYSwkJiMqbOhmtpopPT_P5zWW4jxBzuB7HB_FIEkh7ykXYS7oXO5c8asvhX77h703KY7oHbYSJj_YdiDrevUbYb7ENTBzJR3i66Q3luY5e4gFBG9bTz-gP5PfkQv2WY4exKUyySHMJiNJqy3xgNH-9P8OVQ4waujoYnHMOypaE5jlOR_gcF-qEh6RyTtlKOmNN0J0SB17kgffkj5dj-0Yd_Z9AHeknqqQipMbZUUYLvH54PX5HQsmHgMmuf">
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<h5 class="font-headline-md text-body-lg font-bold truncate">Julian Chen</h5>
+<span class="font-label-caps text-[12px] text-on-surface-variant">Yesterday</span>
+</div>
+<p class="font-body-md text-on-surface-variant truncate">Shared a new route with you.</p>
+</div>
+</div>
+<!-- Additional Context Items -->
+<div class="flex items-center gap-md p-md bg-surface rounded-xl hover:bg-surface-container-low transition-colors group cursor-pointer border border-transparent active:scale-[0.99]">
+<div class="shrink-0">
+<div class="w-14 h-14 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Close up of a friendly golden retriever wearing a blue harness, looking at the camera, blurred park background, soft lighting, community-first movement philosophy style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZNHckTS94_tW6eXonrTi4YXGDaM3Oclo4eOJeZ0GSM7l6EwIi82O8EID3tM0sLRvZHLEhD8YRsXHtk3sQ9qPHxQll9TBC4S1GDjKSqUSwWnQmu_MRKuk-jHraVw511pJ57lK2lMtThLxQC2MKdu6HDQkZIa9XlixEQpBZNczCSzFQ22aQkZx8yuLCBw0Bn3oQlD82LemJu82ySeMX_D2S7jTW2CBMIRoWxtZGapIhdCnRFuCPdhkhKvuMX4r5euyohkEbzqCBhcGs">
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<h5 class="font-headline-md text-body-lg font-bold truncate">Riley (The Walker)</h5>
+<span class="font-label-caps text-[12px] text-on-surface-variant">2d ago</span>
+</div>
+<p class="font-body-md text-on-surface-variant truncate">Woof! That was a great loop.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-24 right-gutter z-50 w-16 h-16 bg-primary text-white rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform ring-4 ring-surface">
+<span class="material-symbols-outlined !text-3xl" style="font-variation-settings: 'FILL' 1;">directions_walk</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface/90 backdrop-blur-lg shadow-[0_-4px_12px_rgba(0,0,0,0.05)] md:hidden">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="rss_feed">rss_feed</span>
+<span class="font-label-caps text-label-caps">Feed</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="explore_nearby">explore_nearby</span>
+<span class="font-label-caps text-label-caps">Discover</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="fiber_manual_record">fiber_manual_record</span>
+<span class="font-label-caps text-label-caps">Record</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-4 py-1 active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+<span class="font-label-caps text-label-caps">Messages</span>
+</a>
+</nav>
+<script>
+        function switchTab(tab) {
+            const chatsBtn = document.getElementById('tab-chats');
+            const groupsBtn = document.getElementById('tab-groups');
+            
+            if (tab === 'chats') {
+                chatsBtn.classList.add('bg-surface', 'text-primary', 'shadow-sm');
+                chatsBtn.classList.remove('text-on-surface-variant');
+                groupsBtn.classList.remove('bg-surface', 'text-primary', 'shadow-sm');
+                groupsBtn.classList.add('text-on-surface-variant');
+            } else {
+                groupsBtn.classList.add('bg-surface', 'text-primary', 'shadow-sm');
+                groupsBtn.classList.remove('text-on-surface-variant');
+                chatsBtn.classList.remove('bg-surface', 'text-primary', 'shadow-sm');
+                chatsBtn.classList.add('text-on-surface-variant');
+            }
+        }
+
+        // Add small hover effects for list items
+        document.querySelectorAll('.cursor-pointer').forEach(item => {
+            item.addEventListener('mouseenter', () => {
+                item.classList.add('border-primary/5');
+            });
+            item.addEventListener('mouseleave', () => {
+                item.classList.remove('border-primary/5');
+            });
+        });
+    </script>
+
+
+</body></html>

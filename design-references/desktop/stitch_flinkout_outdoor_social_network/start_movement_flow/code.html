@@ -1,0 +1,281 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Pathways | Start Activity</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-container": "#99bab0",
+                    "surface": "#f9f9f8",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#001c3b",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "on-tertiary-fixed-variant": "#832600",
+                    "surface-bright": "#f9f9f8",
+                    "inverse-primary": "#adcec3",
+                    "secondary-fixed": "#d5e3ff",
+                    "on-error": "#ffffff",
+                    "outline": "#717976",
+                    "on-surface": "#191c1c",
+                    "secondary-container": "#9ec2fe",
+                    "error-container": "#ffdad6",
+                    "secondary-fixed-dim": "#a7c8ff",
+                    "on-tertiary-container": "#ff9976",
+                    "on-secondary-fixed-variant": "#1e477b",
+                    "surface-tint": "#46645c",
+                    "background": "#f9f9f8",
+                    "primary-fixed-dim": "#adcec3",
+                    "surface-variant": "#e1e3e2",
+                    "secondary": "#395f94",
+                    "inverse-on-surface": "#f0f1f0",
+                    "on-primary-fixed": "#01201a",
+                    "surface-container-low": "#f3f4f3",
+                    "outline-variant": "#c1c8c4",
+                    "tertiary-fixed": "#ffdbd0",
+                    "surface-container-high": "#e7e8e7",
+                    "inverse-surface": "#2e3131",
+                    "surface-container": "#edeeed",
+                    "on-primary-fixed-variant": "#2e4c44",
+                    "on-tertiary": "#ffffff",
+                    "surface-container-highest": "#e1e3e2",
+                    "on-secondary": "#ffffff",
+                    "primary": "#16342d",
+                    "primary-fixed": "#c8eadf",
+                    "on-tertiary-fixed": "#390c00",
+                    "on-error-container": "#93000a",
+                    "tertiary-container": "#812600",
+                    "tertiary": "#5b1800",
+                    "error": "#ba1a1a",
+                    "on-secondary-container": "#284f83",
+                    "on-background": "#191c1c",
+                    "on-surface-variant": "#414846",
+                    "surface-dim": "#d9dad9",
+                    "primary-container": "#2d4b43",
+                    "electric-lime": "#CCFF00" 
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "xs": "4px",
+                    "xl": "64px",
+                    "sm": "12px",
+                    "lg": "40px",
+                    "gutter": "16px",
+                    "base": "8px",
+                    "container-max": "1200px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Be Vietnam Pro"],
+                    "data-mono": ["Space Grotesk"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "label-caps": ["Space Grotesk"],
+                    "headline-lg": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .map-bg {
+            filter: blur(4px);
+            transition: filter 0.5s ease;
+        }
+        .activity-card.active {
+            border-color: #16342d;
+            background-color: #c8eadf;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md selection:bg-primary-fixed selection:text-on-primary-fixed overflow-hidden">
+<div class="flex h-screen w-full relative">
+<!-- SideNavBar Anchor -->
+<aside class="h-full w-64 hidden md:flex flex-col bg-surface border-r border-outline-variant gap-base p-md z-50">
+<div class="flex items-center gap-sm mb-lg">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary">terrain</span>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">Pathways</h1>
+</div>
+<div class="flex flex-col gap-xs flex-grow">
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-sm px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">radar</span>
+<span class="font-body-md text-body-md">Live Map</span>
+</a>
+<a class="flex items-center gap-sm px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">travel_explore</span>
+<span class="font-body-md text-body-md">Session Finder</span>
+</a>
+<a class="flex items-center gap-sm px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">speed</span>
+<span class="font-body-md text-body-md">My Activity</span>
+</a>
+<a class="flex items-center gap-sm px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">groups</span>
+<span class="font-body-md text-body-md">Clubs</span>
+</a>
+<a class="flex items-center gap-sm px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-body-md text-body-md">Start Session</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto pt-md border-t border-outline-variant">
+<div class="flex items-center gap-sm p-2 rounded-lg hover:bg-surface-container transition-colors cursor-pointer">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border-2 border-primary-fixed">
+<img class="w-full h-full object-cover" data-alt="A profile headshot of a smiling outdoor enthusiast with a scenic mountain range in the background. The lighting is golden hour, warm and inviting. The aesthetic is clean and modern, matching a premium outdoor lifestyle brand with soft focus on the background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuByVfPpdt4JIhUFSOvA8goKc7u3cVMUn9SXPTzLh2K7vuCR-sXPkXJ9Uur-OPILvvlJvDGEG5AWgf-tZJPm7P0jLp39Sf2hdui5N_bjwVhDWzYcKUJg6DwxQlj34fg_j9W4qR7v7txoUPkEwi5quHPkIGoItnnEo3wuoi7k4Zd28MC5KH3vll1RXDtOz_jnf_j3w_H3CEC7Cod3lapW-gOZkku8Zn7vSJx5Wiyh9ls315ObjF9jpj-i9D78xqmV01HsewpVFBXDk32W">
+</div>
+<div>
+<p class="font-body-md text-body-md font-bold text-on-surface">Outdoor Explorer</p>
+<p class="text-xs text-on-surface-variant">Level 12 Trailblazer</p>
+</div>
+</div>
+<a class="flex items-center gap-sm px-4 py-3 mt-sm text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-grow relative flex items-center justify-center overflow-hidden">
+<!-- Blurred Map Background Layer -->
+<div class="absolute inset-0 z-0 map-bg" data-alt="A high-quality satellite view of a vibrant city park with winding trails, lush green spaces, and a nearby river. The map is rendered in a soft, bright, light-themed aesthetic with minimal labels and a gentle, natural color palette of greens and earthy tones. High-end cartographic design style." data-location="Denver" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCUnO6IOnsd607BMhqbEpzjCH0zKq_SHPwObrUZGSHvPMK_Kk0cMzSTW1QqlML_1-SdCrzGq8Mna2UJExgNOpUfWD0m3gwm2R0BL-RV6Tg3VzygbyM6YUWfO7u1qFyIX6l8kRftgCAKgpfEGjKsdlSx9rFdxrNIGf6gl1XWhs4_lDWGSvXHpQ1qtUZv2Sjc5t4mZpufNbQURKUQ4uDh5x5oSPhNgOVdczIVm-TRof6zu5nVT5xlpuNRSwQZFVHUb8uB-U-NQoMj2gwf')">
+<!-- Overlay to ensure text legibility -->
+<div class="absolute inset-0 bg-surface/20"></div>
+</div>
+<!-- Start Activity Modal Panel -->
+<section class="glass-panel w-full max-w-xl mx-gutter rounded-xl shadow-2xl border border-white/50 p-lg z-10 flex flex-col gap-lg animate-in fade-in slide-in-from-bottom-8 duration-700">
+<header class="text-center">
+<h2 class="font-headline-lg text-headline-lg text-primary mb-2">Ready for a move?</h2>
+<p class="text-on-surface-variant font-body-md">Select your activity and set your course.</p>
+</header>
+<!-- Activity Selection Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-md">
+<button class="activity-card group flex flex-col items-center gap-sm p-md rounded-xl border-2 border-transparent bg-surface-container-low hover:bg-surface-container-high hover:scale-105 active:scale-95 transition-all" onclick="selectActivity(this)">
+<span class="material-symbols-outlined text-primary text-3xl">directions_walk</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Walk</span>
+</button>
+<button class="activity-card group flex flex-col items-center gap-sm p-md rounded-xl border-2 border-transparent bg-surface-container-low hover:bg-surface-container-high hover:scale-105 active:scale-95 transition-all active" onclick="selectActivity(this)">
+<span class="material-symbols-outlined text-primary text-3xl">run_circle</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Run</span>
+</button>
+<button class="activity-card group flex flex-col items-center gap-sm p-md rounded-xl border-2 border-transparent bg-surface-container-low hover:bg-surface-container-high hover:scale-105 active:scale-95 transition-all" onclick="selectActivity(this)">
+<span class="material-symbols-outlined text-primary text-3xl">directions_bike</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Cycle</span>
+</button>
+<button class="activity-card group flex flex-col items-center gap-sm p-md rounded-xl border-2 border-transparent bg-surface-container-low hover:bg-surface-container-high hover:scale-105 active:scale-95 transition-all" onclick="selectActivity(this)">
+<span class="material-symbols-outlined text-primary text-3xl">hiking</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Hike</span>
+</button>
+</div>
+<!-- Goal Tracking Section -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-md">
+<div class="flex justify-between items-end mb-sm">
+<div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-1">TODAY'S GOAL</h3>
+<p class="font-headline-md text-headline-md font-bold text-on-surface">5,420 <span class="text-body-md font-normal text-on-surface-variant">/ 8,000 steps</span></p>
+</div>
+<div class="text-right">
+<span class="font-data-mono text-data-mono text-primary font-bold">68% COMPLETE</span>
+</div>
+</div>
+<div class="w-full h-3 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-electric-lime w-[68%] transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(204,255,0,0.5)]"></div>
+</div>
+</div>
+<!-- Go Live Toggle -->
+<div class="flex items-center justify-between p-md bg-secondary-container/20 rounded-xl border border-secondary-fixed-dim/30">
+<div class="flex-grow pr-md">
+<div class="flex items-center gap-xs mb-1">
+<span class="material-symbols-outlined text-secondary text-sm">sensors</span>
+<h4 class="font-body-md text-body-md font-bold text-secondary">Go Live</h4>
+</div>
+<p class="text-sm text-on-secondary-fixed-variant leading-tight">Allow others to join your route in real-time. Boost community safety and motivation.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value="">
+<div class="w-14 h-7 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-primary py-lg rounded-xl flex items-center justify-center gap-sm group relative overflow-hidden transition-all hover:shadow-xl active:scale-[0.98]">
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+<span class="material-symbols-outlined text-electric-lime" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<span class="text-white font-headline-md text-headline-md tracking-wide">Start Tracking</span>
+</button>
+</section>
+<!-- Atmospheric Floating Elements (UI Decor) -->
+<div class="absolute top-10 right-10 flex flex-col gap-sm z-20">
+<div class="glass-panel p-md rounded-xl border border-white/50 flex items-center gap-sm shadow-md animate-bounce">
+<div class="w-2 h-2 rounded-full bg-error animate-pulse"></div>
+<p class="font-data-mono text-data-mono text-on-surface">3 Live Groups Nearby</p>
+</div>
+</div>
+</main>
+</div>
+<!-- Floating Map Controls -->
+<div class="fixed bottom-gutter right-gutter flex flex-col gap-base z-50">
+<button class="w-12 h-12 rounded-full glass-panel flex items-center justify-center text-primary shadow-lg hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined">my_location</span>
+</button>
+<button class="w-12 h-12 rounded-full glass-panel flex items-center justify-center text-primary shadow-lg hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined">layers</span>
+</button>
+</div>
+<script>
+        function selectActivity(element) {
+            // Remove active class from all
+            document.querySelectorAll('.activity-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            // Add to clicked
+            element.classList.add('active');
+            
+            // Subtle feedback
+            console.log('Activity selected:', element.innerText.trim());
+        }
+
+        // Entrance animation logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const progressBar = document.querySelector('.bg-electric-lime');
+            progressBar.style.width = '0%';
+            setTimeout(() => {
+                progressBar.style.width = '68%';
+            }, 500);
+        });
+    </script>
+</body></html>

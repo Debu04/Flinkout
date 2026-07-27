@@ -1,15 +1,92 @@
 'use client';
+
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, type NearbyActivity, type NearbyPerson, type User } from '../lib/api';
-import { formatDistance, labelFor } from '../lib/activity';
-const NearbyMap = dynamic(() => import('./nearby-map').then(module => module.NearbyMap), { ssr: false, loading: () => <div className="map"/> });
+import { useInteractions } from './interaction-provider';
+
+const NearbyMap = dynamic(() => import('./nearby-map').then(module => module.NearbyMap), { ssr: false, loading: () => <div className="map" /> });
 type Result = { people: NearbyPerson[]; activities: NearbyActivity[]; precision: string };
-const preview: Result = { precision: 'demo', people: [{ id:'preview-maya',username:'maya_runs',displayName:'Maya Patel',photoUrl:null,latitude:19.076,longitude:72.878,distanceKm:1.2 },{ id:'preview-arjun',username:'arjun_moves',displayName:'Arjun Mehta',photoUrl:null,latitude:19.082,longitude:72.872,distanceKm:3.1 }], activities: [{ id:'preview-activity',type:'RUN',startedAt:new Date().toISOString(),distanceM:6400,latitude:19.073,longitude:72.883,distanceKm:1.8,route:null,user:{id:'preview-maya',username:'maya_runs',displayName:'Maya Patel',photoUrl:null}}] };
-export function DiscoveryExperience({ mapOnly = false }: { mapOnly?: boolean }) { const [result, setResult] = useState<Result>(preview); const [center, setCenter] = useState<[number, number]>([19.076,72.878]); const [radius, setRadius] = useState(10); const [error, setError] = useState(''); const [loading, setLoading] = useState(false); const [search, setSearch] = useState(''); const [users, setUsers] = useState<User[]>([]);
-  function discover() { if (!navigator.geolocation) { setError('Location is unavailable in this browser.'); return; } setLoading(true); setError(''); navigator.geolocation.getCurrentPosition(async position => { const location = { latitude: position.coords.latitude, longitude: position.coords.longitude }; try { await api('/discovery/location', { method: 'PUT', body: JSON.stringify(location) }); const nearby = await api<Result>(`/discovery/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radiusKm=${radius}`); setCenter([location.latitude, location.longitude]); setResult(nearby); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load nearby discovery'); } finally { setLoading(false); } }, geolocationError => { setLoading(false); setError(geolocationError.code === geolocationError.PERMISSION_DENIED ? 'Location permission was denied. You can still search for people by name.' : 'No location is currently available. Try again outdoors or check device location settings.'); }, { enableHighAccuracy: false, timeout: 12_000, maximumAge: 300_000 }); }
-  async function findPeople(event: React.FormEvent) { event.preventDefault(); if (!search.trim()) return; try { const found = await api<{users: User[]}>(`/users/search?q=${encodeURIComponent(search.trim())}`); setUsers(found.users); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not search people'); } }
-  const controls = <section className="card discovery-controls"><div><h2>{mapOnly ? 'Nearby map' : 'Discover nearby'}</h2><p className="hint">Your stored discovery location is rounded to roughly 1 km.</p></div><label className="field">Radius<select value={radius} onChange={event => setRadius(Number(event.target.value))}><option value={5}>5 km</option><option value={10}>10 km</option><option value={25}>25 km</option><option value={50}>50 km</option></select></label><button className="button" disabled={loading} onClick={discover}>{loading ? 'Finding nearby…' : 'Use my location'}</button></section>;
-  if (mapOnly) return <section className="stack"><div className="hero"><h1>Nearby map</h1><p>Explore public activity areas and opt-in nearby people.</p></div>{controls}{error && <p className="error" role="alert">{error}</p>}{center && result ? <><NearbyMap center={center} radiusKm={radius} people={result.people} activities={result.activities}/><p className="hint">Showing {result.people.length} people and {result.activities.length} public activities. Locations are approximate.</p></> : <section className="card empty-state"><p>Choose “Use my location” to load a privacy-safe nearby map.</p></section>}</section>;
-  return <section className="stack"><div className="hero"><h1>Explore</h1><p>Find movers and public activities around you—without exposing exact locations.</p></div>{controls}{error && <p className="error" role="alert">{error}</p>}<section className="card stack"><h2>Find people</h2><form className="row" onSubmit={findPeople}><label className="sr-only" htmlFor="people-search">Search people</label><input id="people-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by name or username"/><button className="button secondary">Search</button></form>{users.map(user => <Link className="row search-person" key={user.id} href={`/u/${user.username}`}><span className="avatar small">{user.profile?.displayName[0] ?? user.username[0]}</span><span><strong>{user.profile?.displayName}</strong><small>@{user.username}</small></span></Link>)}</section>{result && <><section className="card stack"><h2>People Near You</h2>{result.people.length ? result.people.map(person => <Link className="row nearby-row" key={person.id} href={`/u/${person.username}`}><span className="avatar small">{person.displayName[0]}</span><span className="grow"><strong>{person.displayName}</strong><small>@{person.username}</small></span><span className="hint">~{person.distanceKm.toFixed(1)} km</span></Link>) : <p className="hint">No discoverable people nearby yet.</p>}</section><section className="card stack"><h2>Activities Near You</h2>{result.activities.length ? result.activities.map(activity => <Link className="nearby-row row" key={activity.id} href={`/activities/${activity.id}`}><span className="activity-type">{labelFor(activity.type)}</span><span className="grow"><strong>{activity.user.displayName}</strong><small>{formatDistance(activity.distanceM)} · ~{activity.distanceKm.toFixed(1)} km away</small></span></Link>) : <p className="hint">No public activity areas nearby yet.</p>}</section><section className="card stack"><h2>Activity Areas</h2>{center && <NearbyMap center={center} radiusKm={radius} people={result.people} activities={result.activities}/>}<Link className="button secondary" href="/map">Open full map</Link></section></>}</section>; }
+const preview: Result = {
+  precision: 'demo',
+  people: [
+    { id: 'preview-marcus', username: 'marcus_moves', displayName: 'Marcus Rivera', photoUrl: null, latitude: 34.052, longitude: -118.244, distanceKm: .4 },
+    { id: 'preview-elena', username: 'elena_trails', displayName: 'Elena Rodriguez', photoUrl: null, latitude: 34.058, longitude: -118.251, distanceKm: 1.2 },
+  ],
+  activities: [{ id: 'preview-activity', type: 'RUN', startedAt: new Date().toISOString(), distanceM: 4200, latitude: 34.055, longitude: -118.248, distanceKm: 1.8, route: null, user: { id: 'preview-marcus', username: 'marcus_moves', displayName: 'Marcus Rivera', photoUrl: null } }],
+};
+
+const buddies = [
+  { username: 'marcus_moves', detail: '12.4 km this week', initial: 'M', live: true },
+  { username: 'trail_seeker', detail: '8 walks shared', initial: 'T' },
+  { username: 'hiking_henry', detail: 'Loves #DogFriendly', initial: 'H' },
+];
+
+export function DiscoveryExperience({ mapOnly = false }: { mapOnly?: boolean }) {
+  const { notify } = useInteractions();
+  const [result, setResult] = useState(preview);
+  const [center, setCenter] = useState<[number, number]>([34.052, -118.244]);
+  const [radius, setRadius] = useState(5);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [following, setFollowing] = useState<string[]>([]);
+  const [filter, setFilter] = useState<'ALL' | 'DISTANCE' | 'MORNING'>('ALL');
+  const [recent, setRecent] = useState(['#LakeviewPath', '@marcus_moves']);
+
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get('q');
+    if (initial) setSearch(initial);
+  }, []);
+
+  function discover() {
+    if (!navigator.geolocation) { setError('Location is unavailable in this browser.'); return; }
+    setLoading(true); setError('');
+    navigator.geolocation.getCurrentPosition(async position => {
+      const location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      try {
+        await api('/discovery/location', { method: 'PUT', body: JSON.stringify(location) });
+        const nearby = await api<Result>(`/discovery/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radiusKm=${radius}`);
+        setCenter([location.latitude, location.longitude]); setResult(nearby);
+      } catch { setError('Showing privacy-safe sample discovery results.'); }
+      finally { setLoading(false); }
+    }, () => { setLoading(false); setError('Location permission was denied. Search and sample discovery remain available.'); }, { enableHighAccuracy: false, timeout: 12_000, maximumAge: 300_000 });
+  }
+
+  async function findPeople(event: React.FormEvent) {
+    event.preventDefault();
+    if (!search.trim()) return;
+    const term = search.trim();
+    setRecent(current => [term, ...current.filter(value => value.toLowerCase() !== term.toLowerCase())].slice(0, 5));
+    const demoUsers: User[] = buddies.filter(buddy => `${buddy.username} ${buddy.detail}`.toLowerCase().includes(term.toLowerCase().replace('@', ''))).map(buddy => ({ id: `demo-${buddy.username}`, username: buddy.username, profile: { displayName: buddy.username.split('_').map(value => value[0].toUpperCase() + value.slice(1)).join(' '), bio: buddy.detail, photoUrl: null, profileVisibility: 'PUBLIC', routeVisibility: 'PUBLIC', discoverable: true } }));
+    setUsers(demoUsers);
+    setError(demoUsers.length ? 'Showing matching preview profiles.' : 'No preview profiles matched. Try “trail” or “Marcus”.');
+    try {
+      const found = await api<{ users: User[] }>(`/users/search?q=${encodeURIComponent(term)}`);
+      if (found.users.length) { setUsers(found.users); setError(''); }
+    } catch { /* Keep useful preview results while the API is offline. */ }
+  }
+
+  function toggleFollow(username: string) {
+    const active = following.includes(username);
+    setFollowing(current => active ? current.filter(value => value !== username) : [...current, username]);
+    notify(active ? `You unfollowed @${username}.` : `You’re now following @${username}.`);
+  }
+
+  if (mapOnly) return <section className="stack desktop-nearby-block">
+    <section className="card discovery-controls"><div><h2>Nearby map</h2><p className="hint">Locations are approximate and privacy-safe.</p></div><label className="field">Radius<select value={radius} onChange={event => setRadius(Number(event.target.value))}><option value={5}>5 km</option><option value={10}>10 km</option><option value={25}>25 km</option></select></label><button className="button" disabled={loading} onClick={discover}>{loading ? 'Finding nearby…' : 'Use my location'}</button></section>
+    {error && <p className="demo-note">{error}</p>}<NearbyMap center={center} radiusKm={radius} people={result.people} activities={result.activities} />
+  </section>;
+
+  return <section className="discovery-page">
+    <div className="discovery-filters"><button className={filter === 'ALL' ? 'selected' : ''} onClick={() => setFilter('ALL')}>All Vibes</button><button className={filter === 'DISTANCE' ? 'selected' : ''} onClick={() => setFilter('DISTANCE')}>Distance &lt; 5km</button><button className={filter === 'MORNING' ? 'selected' : ''} onClick={() => setFilter('MORNING')}>Time: Morning</button></div>
+    <form className="discovery-search" onSubmit={findPeople}><label className="sr-only" htmlFor="people-search">Search people, routes, or buddies</label><span>⌕</span><input id="people-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search people, routes, or buddies…" /><button className="discovery-search-button" aria-label="Search">→</button></form>
+    {error && <p className="demo-note">{error}</p>}
+    <section className="recent-searches"><header><h1>Recent Searches</h1>{recent.length > 0 && <button onClick={() => setRecent([])}>Clear all</button>}</header><div>{recent.length ? recent.map(value => <span className="recent-chip" key={value}><button onClick={() => setSearch(value)}>{value}</button><button aria-label={`Remove ${value} from recent searches`} onClick={() => setRecent(current => current.filter(item => item !== value))}>×</button></span>) : <p className="hint">Your recent searches will appear here.</p>}</div></section>
+    {users.length > 0 && <section className="suggested-buddies"><h2>Search Results</h2>{users.map(user => <Link href={`/u/${user.username}`} className="suggested-buddy" key={user.id}><span className="avatar small">{user.profile?.displayName?.[0] ?? user.username[0]}</span><span><strong>@{user.username}</strong><small>{user.profile?.displayName}</small></span></Link>)}</section>}
+    <section className="suggested-buddies"><h2>{filter === 'MORNING' ? 'Morning Movers' : filter === 'DISTANCE' ? 'Within 5 km' : 'Suggested Buddies'}</h2>{buddies.map(buddy => <article className="suggested-buddy" key={buddy.username}><Link href={`/u/${buddy.username}`} className={`avatar small ${buddy.live ? 'online' : ''}`}>{buddy.initial}</Link><span><strong>@{buddy.username}</strong><small>{buddy.detail}</small></span><button className={following.includes(buddy.username) ? 'following' : ''} aria-label={`${following.includes(buddy.username) ? 'Unfollow' : 'Follow'} @${buddy.username}`} onClick={() => toggleFollow(buddy.username)}>{following.includes(buddy.username) ? 'Following' : 'Follow'}</button></article>)}</section>
+    <section className="trending-nearby"><h2>Trending Nearby</h2><div className="trending-grid"><Link href="/activities/demo-run"><span className="trend-route easy">⌁</span><strong>Canyon Rim Loop</strong><small>4.2 km</small></Link><Link href="/activities/demo-ride"><span className="trend-route scenic">⌁</span><strong>Lakeview Path</strong><small>2.8 km</small></Link></div><Link href="/activities/demo-run" className="featured-trail"><span className="trail-symbol">▲</span><span><strong>Summit Ridge</strong><p>A challenging climb with rewarding 360° views of the valley.</p><small>◷ 1h 45m · +340m</small></span><b>TOP RATED</b></Link></section>
+  </section>;
+}

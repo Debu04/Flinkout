@@ -1,0 +1,294 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport">
+<title>Flinkout | Live Activity Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed": "#ffdbd0",
+                    "surface-container-high": "#e7e8e7",
+                    "on-error": "#ffffff",
+                    "primary-fixed-dim": "#adcec3",
+                    "on-tertiary-fixed-variant": "#832600",
+                    "on-background": "#191c1c",
+                    "on-tertiary-container": "#ff9976",
+                    "on-error-container": "#93000a",
+                    "background": "#f9f9f8",
+                    "on-primary": "#ffffff",
+                    "primary": "#16342d",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed-variant": "#1e477b",
+                    "secondary-container": "#9ec2fe",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed": "#390c00",
+                    "on-secondary-fixed": "#001c3b",
+                    "outline": "#717976",
+                    "inverse-primary": "#adcec3",
+                    "surface-variant": "#e1e3e2",
+                    "on-primary-fixed": "#01201a",
+                    "primary-fixed": "#c8eadf",
+                    "primary-container": "#2d4b43",
+                    "inverse-surface": "#2e3131",
+                    "on-surface": "#191c1c",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "on-secondary-container": "#284f83",
+                    "secondary-fixed-dim": "#a7c8ff",
+                    "on-primary-fixed-variant": "#2e4c44",
+                    "on-primary-container": "#99bab0",
+                    "on-surface-variant": "#414846",
+                    "tertiary-container": "#812600",
+                    "tertiary": "#5b1800",
+                    "secondary": "#395f94",
+                    "on-secondary": "#ffffff",
+                    "surface-container": "#edeeed",
+                    "inverse-on-surface": "#f0f1f0",
+                    "surface-dim": "#d9dad9",
+                    "surface-container-highest": "#e1e3e2",
+                    "surface-container-low": "#f3f4f3",
+                    "surface-bright": "#f9f9f8",
+                    "surface": "#f9f9f8",
+                    "secondary-fixed": "#d5e3ff",
+                    "outline-variant": "#c1c8c4",
+                    "surface-tint": "#46645c",
+                    "on-tertiary": "#ffffff",
+                    "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "64px",
+                    "sm": "12px",
+                    "container-max": "1200px",
+                    "xs": "4px",
+                    "md": "24px",
+                    "lg": "40px",
+                    "gutter": "16px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "data-mono": ["Space Grotesk"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "label-caps": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        .pulse-dot {
+            position: relative;
+            width: 16px;
+            height: 16px;
+            background: #395f94;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(57, 95, 148, 0.5);
+        }
+        
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(57, 95, 148, 0.4);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3.5); opacity: 0; }
+        }
+
+        .map-glass {
+            background: rgba(249, 249, 248, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .heatmap-teal {
+            background: radial-gradient(circle, rgba(173, 206, 195, 0.6) 0%, rgba(173, 206, 195, 0) 70%);
+        }
+
+        .heatmap-orange {
+            background: radial-gradient(circle, rgba(255, 181, 157, 0.6) 0%, rgba(255, 181, 157, 0) 70%);
+        }
+
+        .fab-shadow {
+            box-shadow: 0 8px 24px rgba(22, 52, 45, 0.25);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm transition-all duration-200 h-16 flex justify-between items-center px-gutter">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary hover:bg-surface-container-high/50 p-2 rounded-full transition-all active:scale-95" data-icon="menu">menu</button>
+<h1 class="font-headline-md text-headline-md font-extrabold text-primary">Flinkout</h1>
+</div>
+<div class="flex items-center gap-2">
+<div class="relative">
+<button class="material-symbols-outlined text-primary hover:bg-surface-container-high/50 p-2 rounded-full transition-all active:scale-95" data-icon="notifications">notifications</button>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border border-white"></span>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-primary-fixed overflow-hidden ml-1 cursor-pointer active:scale-95 transition-transform">
+<img class="w-full h-full object-cover" data-alt="A close-up professional profile portrait of a friendly young woman with an outdoor-loving aesthetic, wearing a green fleece jacket against a soft blurred forest background. The lighting is warm and natural, capturing a vibrant, adventurous spirit consistent with the Flinkout brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyjVgIG-21lbCUGyObqt0XqOCFkaBrDkMmjv1xCmguvdn88m_xkPckLnyF7yc1uOWhLPVil5NWQMSVgZsQDvJq2eis4ma2Tbuam1PZqKZGqjLVtwvCPlIYIhhSzZiV68w1sBNOyaXMRsdWjE--3OJDNP2sQCrRKdMWRXPlf7NxDRoOBIFjA5VMSEJYt_PVWwia22QYfXNuncTd0qXHblA_59EzHaBk5wh3h3s_i9-snT5yU9p1yWvCT_5JOhUbwRR0pbaM8L9apcVm">
+</div>
+</div>
+</header>
+<!-- Map Canvas -->
+<main class="relative w-full h-screen overflow-hidden">
+<!-- Base Map Layer -->
+<div class="absolute inset-0 z-0 bg-[#e0e4df]">
+<div class="w-full h-full bg-cover bg-center opacity-80 mix-blend-multiply" data-location="Los Angeles" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBumHjvm-C7siVUU3J21qKf3sG1pX0UbM7uqcPKU36ExfJWCyNNrYCZSQWLjHZDSOmYgyerZ26NZN2KGTyrNyUIXhJW_5SxsEub4r5vP7yQKdZJPiLIkpuKnPZGV4YfYdQJ4fdQ34BRmS30K0vHOICRzIrSQhNju-S45yDA1pW8UyGEW8qMpdvCXEjo59UVm2gPMxKU-tLwWl4LqCZTsBFau07i8pcSCad_uYjvKbasxyNYYU1zwhqefxLcN9GNQnMd6iKi24JIQgGg')"></div>
+<!-- Heatmap Effects -->
+<div class="heatmap-teal absolute top-[30%] left-[20%] w-[300px] h-[300px] rounded-full"></div>
+<div class="heatmap-orange absolute bottom-[25%] right-[15%] w-[400px] h-[400px] rounded-full"></div>
+<div class="heatmap-teal absolute top-[60%] right-[40%] w-[250px] h-[250px] rounded-full"></div>
+<svg class="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-60" viewBox="0 0 400 800"><path class="animate-pulse" d="M 50 100 Q 150 150 100 300 T 200 500" fill="none" stroke="#adcec3" stroke-linecap="round" stroke-width="4" style="filter: drop-shadow(0 0 8px #adcec3)"></path><path class="animate-pulse" d="M 300 200 Q 250 400 350 600" fill="none" stroke="#adcec3" stroke-linecap="round" stroke-width="4" style="filter: drop-shadow(0 0 8px #adcec3)"></path></svg></div>
+<!-- Interactive Map Elements -->
+<div class="absolute inset-0 z-10 pointer-events-none">
+<!-- User Location -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto"><div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full border-2 border-primary/20 bg-primary/5 pointer-events-none"></div>
+<div class="pulse-dot"></div>
+</div>
+<!-- Nearby Friend: Marcus -->
+<div class="absolute top-[35%] left-[25%] pointer-events-auto flex flex-col items-center">
+<div class="w-12 h-12 rounded-full border-2 border-white shadow-lg overflow-hidden bg-surface-container-high transition-transform active:scale-90 cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A portrait of a cheerful young man named Marcus, wearing athletic gear and a headband, laughing heartily in a sunny urban park setting. High-quality digital photography with a bright and airy Flinkout community feel." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMLGrp-8wFGXj-K11wd3ff-LqeirIuF0xuWRIyU6c4C1NgR4u2fMCo3wWeA5Bbm-qKJap51s2EN0By6y_Tr3gFnO1HNNdhyE5ENzuxpLQ1uAXjIS-ymldqCY59avRVJD5mvrLNhPcON6oJ3yOTtR_eLHjo3OYel4cSJPfnc0fGox_OH--uR0h1mdwTPelR0DzadCBU5L94GWax7tVj3ru5Qx8FNO7wrvUOw7aXzpEsdY8psxmHqhHqY2UN0PPBta4cVqpCHt8Z9RBE">
+</div><div class="absolute -top-1 -right-1 bg-secondary text-on-secondary text-[8px] px-1.5 py-0.5 rounded-full font-bold border border-white shadow-sm">LIVE</div>
+<span class="bg-surface/90 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 shadow-sm border border-outline-variant/30">Marcus</span>
+</div>
+<!-- Nearby Friend: Elena -->
+<div class="absolute bottom-[40%] right-[30%] pointer-events-auto flex flex-col items-center">
+<div class="w-12 h-12 rounded-full border-2 border-white shadow-lg overflow-hidden bg-surface-container-high transition-transform active:scale-90 cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A close-up profile of Elena, a woman with braided hair and an outdoor backpack, looking at a map on her phone. Soft afternoon sunlight filters through trees, creating a warm, approachable atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqrM3wmsDuYBEot8n2aCPrk8GR4rH1YzBiaALbBMIIT2ulv-HLKyeq5VWF4HsNTE6qMCFaAtU4iorYSKBODogxk4gng_GLTmFQpNa_DHMQ9sX4pPM3QjuUs9v73Pduhtdjb4uekvN9MOroupEbY1Hawy1iCSKF8FZJDch-KvMaJ64mxlMsWawXTDbWfETZesvZinzakvQVlE3zGBBeKq2JV8qfRt8M0dEFasyAtVWM46SWcZJtHtOxWoXSK-6WCbsOJSDVxVP9cGia">
+</div><div class="absolute -top-1 -right-1 bg-secondary text-on-secondary text-[8px] px-1.5 py-0.5 rounded-full font-bold border border-white shadow-sm">LIVE</div>
+<span class="bg-surface/90 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 shadow-sm border border-outline-variant/30">Elena</span>
+</div>
+<!-- Event Pin: Community Walk -->
+<div class="absolute top-[20%] right-[20%] pointer-events-auto">
+<div class="flex items-center bg-primary text-on-primary px-3 py-2 rounded-full shadow-xl gap-2 active:scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="groups">groups</span>
+<span class="font-label-caps text-label-caps whitespace-nowrap">Community Walk</span>
+<div class="w-2 h-2 rounded-full bg-secondary-fixed animate-ping"></div>
+</div>
+<div class="w-px h-4 bg-primary mx-auto"></div>
+</div>
+<!-- Event Pin: Trail Cleanup -->
+<div class="absolute bottom-[30%] left-[15%] pointer-events-auto">
+<div class="flex items-center bg-tertiary text-on-tertiary px-3 py-2 rounded-full shadow-xl gap-2 active:scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="volunteer_activism">volunteer_activism</span>
+<span class="font-label-caps text-label-caps whitespace-nowrap">Trail Cleanup</span>
+</div>
+<div class="w-px h-4 bg-tertiary mx-auto"></div>
+</div>
+</div>
+<!-- Floating Controls -->
+<div class="absolute right-gutter top-20 z-20 flex flex-col gap-4">
+<!-- Map Layer Toggle -->
+<button class="map-glass w-12 h-12 rounded-xl flex items-center justify-center text-primary shadow-lg border border-outline-variant/30 hover:bg-surface-variant transition-colors active:scale-90">
+<span class="material-symbols-outlined" data-icon="layers">layers</span>
+</button>
+<!-- Re-center Button -->
+<button class="map-glass w-12 h-12 rounded-xl flex items-center justify-center text-primary shadow-lg border border-outline-variant/30 hover:bg-surface-variant transition-colors active:scale-90">
+<span class="material-symbols-outlined" data-icon="my_location">my_location</span>
+</button>
+</div>
+<!-- FAB: START Activity -->
+<button class="fixed bottom-24 right-gutter z-30 bg-primary text-on-primary flex items-center gap-3 px-6 py-4 rounded-full fab-shadow active:scale-90 transition-all group overflow-hidden">
+<div class="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+<span class="material-symbols-outlined" data-icon="directions_walk">directions_walk</span>
+<span class="font-display-lg text-[20px] tracking-widest font-extrabold">START</span>
+</button>
+<!-- Distance Overlay Card -->
+<div class="fixed bottom-24 left-gutter z-20"><div class="map-glass px-3 py-1.5 rounded-full shadow-md border border-outline-variant/30 flex items-center gap-2 mb-3 w-fit cursor-pointer active:scale-95 transition-transform"><span class="material-symbols-outlined text-[16px] text-primary">distance</span><span class="text-label-caps text-primary">Radius: 5km</span><span class="material-symbols-outlined text-[14px] text-on-surface-variant">edit</span></div>
+<div class="map-glass p-4 rounded-xl shadow-lg border border-outline-variant/20 max-w-[180px]">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">NEARBY ACTIVITY</p>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-md text-primary">12</span>
+<span class="text-body-md font-bold text-on-surface-variant">Explorers</span>
+</div>
+<p class="text-[10px] text-on-surface-variant mt-1 italic">3 events starting within 1mi</p>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface/90 backdrop-blur-lg rounded-t-xl shadow-lg flex justify-around items-center px-4 pt-2 pb-safe">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-variant/40 transition-all duration-300 active:scale-90 px-3 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</a>
+<!-- Search -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-variant/40 transition-all duration-300 active:scale-90 px-3 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+<span class="font-label-caps text-label-caps mt-1">Search</span>
+</a>
+<!-- Map (Active) -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-2 transition-all duration-300 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="map" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="font-label-caps text-label-caps mt-1">Map</span>
+</a>
+<!-- Messages -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-variant/40 transition-all duration-300 active:scale-90 px-3 py-1" href="#">
+<div class="relative">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 bg-secondary rounded-full"></span>
+</div>
+<span class="font-label-caps text-label-caps mt-1">Messages</span>
+</a>
+</nav>
+<!-- Overlay Layer for Interaction Feedback -->
+<script>
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('click', (e) => {
+                // Simple ripple or feedback can be added here
+                console.log('Interaction captured on:', el.innerText || el.getAttribute('data-icon'));
+            });
+        });
+        
+        // Optional: Slight parallax or float effect on map elements
+        window.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 10;
+            const y = (e.clientY / window.innerHeight - 0.5) * 10;
+            // Map movement would go here if needed, keeping it subtle
+        });
+    </script>
+</body></html>
