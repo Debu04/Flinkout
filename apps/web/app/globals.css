@@ -373,7 +373,7 @@ body { font-family:"Be Vietnam Pro","Segoe UI",Arial,sans-serif; }
 }
 
 @media (min-width:900px) {
-  .mobile-topbar,.mobile-start-fab,.mobile-nav-links,.mobile-feed-section,.mobile-buddy-spotlight,.mobile-discovery-map,.standalone-mobile-header { display:none; }
+  .mobile-topbar,.mobile-start-fab,.mobile-nav-links,.mobile-feed-section,.mobile-buddy-spotlight,.mobile-discovery-map,.standalone-mobile-header,.mobile-drawer-layer { display:none; }
   .desktop-nav-links { display:flex; flex-direction:column; gap:7px; }
   .desktop-nav-links a { min-height:50px; display:flex; align-items:center; gap:13px; padding:0 14px; color:#414846; border-radius:8px; }
   .desktop-nav-links a:hover { color:var(--trail-green); background:#edf0ee; }
@@ -417,6 +417,7 @@ body { font-family:"Be Vietnam Pro","Segoe UI",Arial,sans-serif; }
 .mobile-drawer > a[aria-current="page"] { color:#244f43; background:#dfe8e4; }
 .mobile-drawer .drawer-profile { min-height:86px; margin:10px 0 14px; padding:12px; background:white; border:1px solid #e2e5e3; }
 .drawer-profile > span:last-child { display:grid; gap:4px; }.drawer-profile small { color:var(--trail-muted); }
+.drawer-section-label { margin:3px 12px 6px; color:var(--trail-muted); font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
 .mobile-drawer .drawer-record { margin-top:18px; justify-content:center; color:white; background:var(--trail-green); }
 .activity-option-menu,.profile-card-menu { position:absolute; z-index:20; top:58px; right:14px; min-width:170px; padding:7px; display:grid; background:white; border:1px solid #dfe4e1; border-radius:10px; box-shadow:0 10px 28px #16342d20; }
 .activity-option-menu a,.activity-option-menu button,.profile-card-menu a,.profile-card-menu button { min-height:40px; padding:0 11px; display:flex; align-items:center; text-align:left; color:#303a36; background:transparent; border:0; border-radius:7px; font-size:13px; }

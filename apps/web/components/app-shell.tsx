@@ -6,8 +6,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { UiIcon } from './ui-icon';
 
 const desktopNavigation = [
-  { href: '/map', label: 'Live Map', icon: 'map' as const },
-  { href: '/', label: 'Session Finder', icon: 'compass' as const },
+  { href: '/', label: 'Home', icon: 'home' as const },
+  { href: '/explore', label: 'Search', icon: 'search' as const },
+  { href: '/map', label: 'Map', icon: 'map' as const },
+  { href: '/messages', label: 'Messages', icon: 'chat' as const },
   { href: '/profile', label: 'My Activity', icon: 'activity' as const },
   { href: '/clubs', label: 'Clubs', icon: 'group' as const },
   { href: '/profile/edit', label: 'Settings', icon: 'settings' as const },
@@ -18,6 +20,12 @@ const mobileNavigation = [
   { href: '/explore', label: 'Search', icon: 'search' as const },
   { href: '/map', label: 'Map', icon: 'map' as const },
   { href: '/messages', label: 'Messages', icon: 'chat' as const },
+];
+
+const mobileDrawerNavigation = [
+  { href: '/profile', label: 'My Activity', icon: 'activity' as const },
+  { href: '/clubs', label: 'Clubs', icon: 'group' as const },
+  { href: '/profile/edit', label: 'Settings', icon: 'settings' as const },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -70,7 +78,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="mobile-drawer" aria-label="Expanded navigation" onClick={event => event.stopPropagation()}>
         <header><Link href="/" className="mobile-wordmark">Flinkout</Link><button onClick={() => setMenuOpen(false)} aria-label="Close navigation">×</button></header>
         <Link href="/u/marcus_moves" className="drawer-profile"><span className="avatar">M</span><span><strong>Marcus Rivera</strong><small>@marcus_moves</small></span></Link>
-        {[...mobileNavigation, { href: '/clubs', label: 'Clubs', icon: 'group' as const }, { href: '/profile/edit', label: 'Settings', icon: 'settings' as const }].map(item => <Link key={item.href} href={item.href} aria-current={path === item.href ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
+        <p className="drawer-section-label">More from Flinkout</p>
+        {mobileDrawerNavigation.map(item => <Link key={item.href} href={item.href} aria-current={path === item.href ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
         <Link href="/record" className="drawer-record"><UiIcon name="play" /> Start Movement</Link>
       </aside>
     </div>}
