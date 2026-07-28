@@ -1,23 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useInteractions } from '../components/interaction-provider';
+import { useInteractions, usePreviewState } from '../components/interaction-provider';
 import { SocialFeed } from '../components/social-feed';
 
 const livePeople = [
-  { name: 'Maya P.', initial: 'M', tone: 'mountain' },
-  { name: 'Tom G.', initial: 'T', tone: 'forest' },
-  { name: 'Elena S.', initial: 'E', tone: 'sunrise' },
-  { name: 'Mark D.', initial: 'M', tone: 'trail' },
-  { name: 'Lara K.', initial: 'L', tone: 'blue' },
+  { name: 'Sienna', username: 'sienna_trails', initial: 'S', tone: 'mountain' },
+  { name: 'Tara', username: 'trail_seeker', initial: 'T', tone: 'forest' },
+  { name: 'Elena', username: 'elena_trails', initial: 'E', tone: 'sunrise' },
+  { name: 'James', username: 'james_moves', initial: 'J', tone: 'trail' },
+  { name: 'Henry', username: 'hiking_henry', initial: 'H', tone: 'blue' },
 ];
 
 function LiveNearby() {
   return <section className="live-nearby">
-    <div className="trail-section-heading"><h1><span className="live-pulse" />Live Nearby</h1><Link href="/map">View all</Link></div>
+    <div className="trail-section-heading"><h1><span className="live-pulse" />Live Nearby</h1><Link href="/map">View map</Link></div>
     <div className="live-people" aria-label="People sharing live activities nearby">
-      {livePeople.map(person => <Link href="/map" className="live-person" key={person.name}>
+      {livePeople.map(person => <Link href={`/u/${person.username}`} className="live-person" key={person.username}>
         <span className={`live-avatar ${person.tone}`}><span>{person.initial}</span><b>LIVE</b></span>
         <small>{person.name}</small>
       </Link>)}
@@ -26,32 +25,57 @@ function LiveNearby() {
 }
 
 function StartingSoon() {
+  const { state, toggleSession } = usePreviewState();
+  const { notify } = useInteractions();
+  const sessions = [
+    { id: 'misty', activityId: 'demo-walk', minutes: 18, name: 'Sunday Sunrise Walk', location: 'East Side Park', faces: 'M T E', count: 12 },
+    { id: 'river', activityId: 'demo-run', minutes: 45, name: 'Hill Training Session', location: 'Peak Trail Entrance', faces: 'J K', count: 4 },
+  ];
+
+  function join(id: string, name: string) {
+    const active = state.joinedSessionIds.includes(id);
+    toggleSession(id);
+    notify(active ? `You left ${name}.` : `You joined ${name}. We will remind you before it starts.`);
+  }
+
   return <section className="trail-panel">
-    <header><h2>Starting Soon</h2><span className="panel-icon">▣</span></header>
-    <Link href="/activities/demo-walk" className="event-card"><span className="event-time"><strong>18</strong><small>MIN</small></span><div><strong>Sunday Sunrise Walk</strong><small>⌖ East Side Park</small><p><span className="mini-faces">M T E</span> +12 joining</p></div></Link>
-    <Link href="/activities/demo-run" className="event-card"><span className="event-time orange"><strong>45</strong><small>MIN</small></span><div><strong>Hill Training Session</strong><small>⌖ Peak Trail Entrance</small><p><span className="mini-faces">J K</span> +4 joining</p></div></Link>
+    <header><h2>Starting Soon</h2><span className="panel-icon" aria-hidden>EVENT</span></header>
+    {sessions.map((session, index) => {
+      const joined = state.joinedSessionIds.includes(session.id);
+      return <article className="event-card" key={session.id}>
+        <Link href={`/activities/${session.activityId}`}><span className={`event-time ${index ? 'orange' : ''}`}><strong>{session.minutes}</strong><small>MIN</small></span><span><strong>{session.name}</strong><small>{session.location}</small><p><span className="mini-faces">{session.faces}</span> +{session.count} joining</p></span></Link>
+        <button className={joined ? 'joined' : ''} onClick={() => join(session.id, session.name)}>{joined ? 'Joined' : 'Join'}</button>
+      </article>;
+    })}
     <Link className="panel-button" href="/explore">View all events</Link>
   </section>;
 }
 
 function BuddyDiscovery() {
-  const [following, setFollowing] = useState<string[]>([]);
+  const { state, toggleFollow } = usePreviewState();
   const { notify } = useInteractions();
+  const people = [
+    { name: 'Sienna Williams', username: 'sienna_trails', detail: 'Frequent trail runner', initial: 'S' },
+    { name: 'Elena Rodriguez', username: 'elena_trails', detail: 'Community walk leader', initial: 'E' },
+  ];
+
   return <section className="trail-panel">
-    <header><h2>Buddy Discovery</h2><span className="panel-icon">↻</span></header>
-    {[['Leo Zhang', 'Frequent Trail Runner', 'L'], ['Chloe Reed', 'Enjoys Nature Walks', 'C']].map(person => <div className="buddy" key={person[0]}><span className="avatar small">{person[2]}</span><span className="grow"><strong>{person[0]}</strong><small>{person[1]}</small></span><button className={following.includes(person[0]) ? 'following' : ''} aria-label={`${following.includes(person[0]) ? 'Unfollow' : 'Follow'} ${person[0]}`} onClick={() => {
-      const active = following.includes(person[0]);
-      setFollowing(current => active ? current.filter(value => value !== person[0]) : [...current, person[0]]);
-      notify(active ? `You unfollowed ${person[0]}.` : `You’re now following ${person[0]}.`);
-    }}>{following.includes(person[0]) ? '✓' : '+'}</button></div>)}
+    <header><h2>Buddy Discovery</h2><Link href="/explore">See all</Link></header>
+    {people.map(person => {
+      const following = state.followingUsernames.includes(person.username);
+      return <div className="buddy" key={person.username}><Link href={`/u/${person.username}`} className="avatar small">{person.initial}</Link><span className="grow"><strong>{person.name}</strong><small>{person.detail}</small></span><button className={following ? 'following' : ''} aria-label={`${following ? 'Unfollow' : 'Follow'} ${person.name}`} onClick={() => {
+        toggleFollow(person.username);
+        notify(following ? `You unfollowed ${person.name}.` : `You are now following ${person.name}.`);
+      }}>{following ? 'Following' : 'Follow'}</button></div>;
+    })}
   </section>;
 }
 
 function LocalHeatmap() {
   return <section className="trail-panel heatmap-preview">
-    <header><h2>Local Activity<br />Heatmap</h2><span className="panel-icon">⌖</span></header>
-    <Link href="/map" className="mini-map" aria-label="Open local activity heatmap"><span className="map-road one" /><span className="map-road two" /><span className="map-water" /><span className="map-radius" /><i className="map-pin pin-one">M</i><i className="map-pin pin-two">T</i></Link>
-    <footer><span><small>DISCOVERY RADIUS</small><strong>5km</strong></span><span><i /> Live Movement</span></footer>
+    <header><h2>Local Activity<br />Heatmap</h2><span className="panel-icon" aria-hidden>MAP</span></header>
+    <Link href="/map" className="mini-map" aria-label="Open local activity heatmap"><span className="map-road one" /><span className="map-road two" /><span className="map-water" /><span className="map-radius" /><i className="map-pin pin-one">S</i><i className="map-pin pin-two">E</i></Link>
+    <footer><span><small>DISCOVERY RADIUS</small><strong>5 km</strong></span><span><i /> Live Movement</span></footer>
   </section>;
 }
 
@@ -66,7 +90,7 @@ export default function Home() {
       <StartingSoon />
       <BuddyDiscovery />
       <LocalHeatmap />
-      <section className="premium-banner"><span>PREMIUM TRAIL GUIDE</span><strong>Unlock 500+ Hidden Trails</strong><button onClick={() => notify('Premium plans are coming soon. You’ve been added to the preview list.')}>Go premium</button></section>
+      <section className="premium-banner"><span>PREMIUM TRAIL GUIDE</span><strong>Unlock 500+ Hidden Trails</strong><button onClick={() => notify('Premium plans are coming soon. You are on the preview list.')}>Go premium</button></section>
     </aside>
   </section>;
 }

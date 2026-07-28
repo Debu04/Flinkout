@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, type Profile, type SocialActivity, type User } from '../lib/api';
+import { demoActivities } from '../lib/demo-data';
 import { ActivityCard } from './activity-card';
-import { useInteractions } from './interaction-provider';
-
-const point = (latitude: number, longitude: number) => ({ latitude, longitude, accuracy: null, altitude: null, speed: null, recordedAt: new Date().toISOString() });
+import { useInteractions, usePreviewState } from './interaction-provider';
 const baseProfile: Profile = { displayName: 'Marcus Rivera', bio: 'Everyday explorer, weekend trail guide, and believer that movement is better together.', photoUrl: null, profileVisibility: 'PUBLIC', routeVisibility: 'FOLLOWERS', discoverable: true };
 function previewUser(): User {
   if (typeof window !== 'undefined') {
@@ -15,10 +14,7 @@ function previewUser(): User {
   }
   return { id: 'demo-marcus', username: 'marcus_moves', profile: baseProfile, isSelf: true };
 }
-const previewActivities: SocialActivity[] = [{
-  id: 'demo-my-run', type: 'RUN', visibility: 'PUBLIC', startedAt: new Date(Date.now() - 86400000).toISOString(), endedAt: null, durationS: 2840, distanceM: 6300,
-  route: [point(34.052, -118.244), point(34.058, -118.238), point(34.055, -118.229)], user: { id: 'demo-marcus', username: 'marcus_moves', profile: { displayName: 'Marcus Rivera', photoUrl: null } }, reactionCount: 31, commentCount: 6, reactedByViewer: false,
-}];
+const previewActivities: SocialActivity[] = [demoActivities['demo-own-walk'].activity];
 
 function Avatar({ user }: { user: User }) {
   const photo = user.profile?.photoUrl;
@@ -30,6 +26,7 @@ export function MyProfile() {
   const [activities, setActivities] = useState<SocialActivity[]>(previewActivities);
   const [preview, setPreview] = useState(true);
   const { notify } = useInteractions();
+  const { resetPreview } = usePreviewState();
   useEffect(() => {
     api<{user: User}>('/auth/me').then(async response => {
       setUser(response.user);
@@ -44,7 +41,14 @@ export function MyProfile() {
     <h2>Recent activities</h2>
     {activities.length ? activities.map(activity => <ActivityCard key={activity.id} initial={activity}/>) : <section className="card empty-state"><p>Activities you sync and share will appear here.</p></section>}
     <button className="button danger" onClick={async () => {
-      if (preview) { notify('Preview profile reset for this session.'); return; }
+      if (preview) {
+        resetPreview();
+        localStorage.removeItem('flinkout-preview-profile');
+        setUser(previewUser());
+        setActivities(previewActivities);
+        notify('Preview activity, social, and profile data were reset.');
+        return;
+      }
       await api('/auth/logout', { method: 'POST' }); location.href = '/login';
     }}>{preview ? 'Reset preview session' : 'Log out'}</button>
   </section>;
