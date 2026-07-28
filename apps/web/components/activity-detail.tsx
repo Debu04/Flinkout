@@ -4,21 +4,15 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, type Comment, type SocialActivity } from '../lib/api';
-import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
+import { formatDistance, formatDuration, formatPace } from '../lib/activity';
+import { useInteractions } from './interaction-provider';
+import { UiIcon } from './ui-icon';
 
-const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map" /> });
+const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map detail-map" /> });
 const point = (latitude: number, longitude: number) => ({ latitude, longitude, accuracy: null, altitude: null, speed: null, recordedAt: new Date().toISOString() });
 
 function sampleActivity(id: string): SocialActivity {
-  const ride = id.includes('ride');
-  return {
-    id, type: ride ? 'RIDE' : 'RUN', visibility: 'PUBLIC',
-    startedAt: new Date(Date.now() - (ride ? 86400000 : 0)).toISOString(), endedAt: new Date().toISOString(),
-    durationS: ride ? 3620 : 2840, distanceM: ride ? 18300 : 7100,
-    route: ride ? [point(19.07, 72.87), point(19.077, 72.881), point(19.084, 72.89)] : [point(19.076, 72.878), point(19.079, 72.882), point(19.081, 72.885)],
-    user: { id: ride ? 'demo-arjun' : 'demo-maya', username: ride ? 'arjun_moves' : 'maya_runs', profile: { displayName: ride ? 'Arjun Mehta' : 'Maya Patel', photoUrl: null } },
-    reactionCount: ride ? 27 : 42, commentCount: 2, reactedByViewer: false,
-  };
+  return { id, type: 'WALK', visibility: 'PUBLIC', startedAt: new Date(Date.now() - 3600000).toISOString(), endedAt: new Date().toISOString(), durationS: 3120, distanceM: 4200, route: [point(49.282, -123.12), point(49.276, -123.111), point(49.27, -123.105)], user: { id: 'demo-elena', username: 'elena_trails', profile: { displayName: 'Elena Rodriguez', photoUrl: null } }, reactionCount: 24, commentCount: 3, reactedByViewer: false };
 }
 
 export function ActivityDetail({ id }: { id: string }) {
@@ -27,61 +21,53 @@ export function ActivityDetail({ id }: { id: string }) {
   const [error, setError] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [highFives, setHighFives] = useState(24);
+  const [highFived, setHighFived] = useState(false);
+  const [helpful, setHelpful] = useState<string[]>([]);
+  const { notify, share } = useInteractions();
 
   useEffect(() => {
+    if (id.startsWith('demo-')) {
+      setActivity(sampleActivity(id));
+      setComments([
+        { id: 'sample-comment-1', body: 'The path near the fountain is a bit slippery today due to the recent rain. Watch your step!', createdAt: new Date().toISOString(), userId: 'demo-sarah', isOwner: false, user: { id: 'demo-sarah', username: 'sarah', profile: { displayName: 'Sarah G.', photoUrl: null } } },
+        { id: 'sample-comment-2', body: 'Great spot for a photo right by the harbor master’s office. The flowers are in full bloom!', createdAt: new Date().toISOString(), userId: 'demo-david', isOwner: false, user: { id: 'demo-david', username: 'david', profile: { displayName: 'David K.', photoUrl: null } } },
+      ]);
+      return;
+    }
     Promise.all([api<{ activity: SocialActivity }>(`/activities/${id}`), api<{ comments: Comment[] }>(`/activities/${id}/comments`)])
       .then(([a, c]) => { setActivity(a.activity); setComments(c.comments); })
-      .catch(cause => {
-        if (id.startsWith('demo-')) {
-          setActivity(sampleActivity(id)); setPreview(true);
-          setComments([
-            { id: 'sample-comment-1', body: 'That route looks brilliant! 🔥', createdAt: new Date().toISOString(), userId: 'demo-neha', isOwner: false, user: { id: 'demo-neha', username: 'neha_moves', profile: { displayName: 'Neha Singh', photoUrl: null } } },
-            { id: 'sample-comment-2', body: 'Strong finish — nicely done.', createdAt: new Date().toISOString(), userId: 'demo-kabir', isOwner: false, user: { id: 'demo-kabir', username: 'kabir_rides', profile: { displayName: 'Kabir Shah', photoUrl: null } } },
-          ]);
-        } else setError(cause instanceof Error ? cause.message : 'Could not load activity');
-      });
+      .catch(cause => setError(cause instanceof Error ? cause.message : 'Could not load activity'));
   }, [id]);
 
   async function addComment(event: React.FormEvent) {
     event.preventDefault();
     if (!body.trim()) return;
-    if (id.startsWith('demo-')) {
-      setComments(current => [{ id: `demo-${Date.now()}`, body: body.trim(), createdAt: new Date().toISOString(), userId: 'viewer', isOwner: true, user: { id: 'viewer', username: 'you', profile: { displayName: 'You', photoUrl: null } } }, ...current]);
-      setBody(''); return;
-    }
+    if (id.startsWith('demo-')) { setComments(current => [{ id: `demo-${Date.now()}`, body: body.trim(), createdAt: new Date().toISOString(), userId: 'viewer', isOwner: true, user: { id: 'viewer', username: 'you', profile: { displayName: 'You', photoUrl: null } } }, ...current]); setBody(''); notify('Community note added.'); return; }
     setSending(true);
-    try {
-      const result = await api<{ comment: Comment }>(`/activities/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
-      setComments(current => [result.comment, ...current]); setBody('');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not add comment'); }
+    try { const result = await api<{ comment: Comment }>(`/activities/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) }); setComments(current => [result.comment, ...current]); setBody(''); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not add note'); }
     finally { setSending(false); }
   }
 
-  async function removeComment(commentId: string) {
-    if (commentId.startsWith('demo-')) { setComments(current => current.filter(comment => comment.id !== commentId)); return; }
-    try { await api(`/activities/${id}/comments/${commentId}`, { method: 'DELETE' }); setComments(current => current.filter(comment => comment.id !== commentId)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not delete comment'); }
-  }
-
   if (error && !activity) return <section className="card error-state"><h1>Activity unavailable</h1><p className="error">{error}</p><Link className="button" href="/">Back to feed</Link></section>;
-  if (!activity) return <FeedSkeleton />;
-  const paceType = activity.type !== 'RIDE';
-  return <section className="stack detail-page">
-    {preview && <p className="demo-note">Interactive preview · reactions and comments stay in this browser session.</p>}
-    <article className="card detail-card stack">
-      <header className="activity-head"><Link href={`/u/${activity.user.username}`} className="row"><span className="avatar small">{(activity.user.profile?.displayName ?? activity.user.username)[0]}</span><span><strong>{activity.user.profile?.displayName ?? activity.user.username}</strong><small>@{activity.user.username}</small></span></Link><span className="activity-type">{labelFor(activity.type)}</span></header>
-      <div className="detail-title"><h1>{paceType ? 'Morning run' : 'Morning city ride'}</h1><p className="hint">{new Date(activity.startedAt).toLocaleString()}</p></div>
-      <RouteMap points={activity.route ?? []} />
-      <div className="activity-metrics"><span><strong>{formatDistance(activity.distanceM)}</strong>Distance</span><span><strong>{formatDuration(activity.durationS)}</strong>Duration</span><span><strong>{paceType ? formatPace(activity.distanceM, activity.durationS) : `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h`}</strong>{paceType ? 'Avg. pace' : 'Avg. speed'}</span></div>
-    </article>
-    <section id="comments" className="card stack comments-panel">
-      <h2>Community cheers</h2>
-      <form className="comment-form" onSubmit={addComment}><label className="sr-only" htmlFor="comment">Add a comment</label><input id="comment" value={body} maxLength={500} onChange={event => setBody(event.target.value)} placeholder="Add a supportive comment…" /><button className="button compact" disabled={sending}>{sending ? 'Posting…' : 'Post'}</button></form>
-      {error && <p className="error">{error}</p>}
-      {comments.length ? comments.map(comment => <article className="comment row" key={comment.id}><span className="avatar small">{(comment.user.profile?.displayName ?? comment.user.username)[0]}</span><div className="grow"><strong>{comment.user.profile?.displayName ?? comment.user.username}</strong><p>{comment.body}</p></div>{comment.isOwner && <button onClick={() => void removeComment(comment.id)}>Delete</button>}</article>) : <p className="hint">No comments yet. Be the first to cheer them on.</p>}
-    </section>
+  if (!activity) return <div className="card skeleton"><span /><span /><span /></div>;
+
+  return <section className="session-detail-page">
+    <header className="standalone-mobile-header"><Link href="/" aria-label="Back">←</Link><strong>Activity</strong><button aria-label="Share activity" onClick={() => void share({ title: 'Morning Harbor Loop on Flinkout', text: 'Take a look at this shared activity.' })}><UiIcon name="share" /></button></header>
+    <div className="session-map-hero"><RouteMap points={activity.route ?? []} /><div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
+    <div className="session-detail-grid">
+      <main>
+        <section className="session-title-card"><div className="avatar small">E</div><div><h1>Morning Harbor Loop</h1><p>by {activity.user.profile?.displayName ?? activity.user.username}</p></div><span>#SunnyWalk</span></section>
+        <button className={`high-five-button ${highFived ? 'active' : ''}`} aria-pressed={highFived} onClick={() => { setHighFived(value => !value); setHighFives(value => value + (highFived ? -1 : 1)); notify(highFived ? 'High-five removed.' : 'High-five sent!'); }}>{highFived ? 'High-Five Sent' : 'Send High-Five'} <b>{highFives}</b></button>
+        <section className="session-timeline"><h2>Session Activity</h2><div><i className="mint">▷</i><span><strong>Session Started</strong><small>08:15 AM · Stanley Park Entrance</small></span></div><div><i className="peach">♥</i><span><strong>Marcus Chen sent a high-five!</strong><small>08:42 AM</small></span></div><div><i className="blue">♙</i><span><strong>Sarah &amp; Toby joined the walk</strong><small>08:55 AM · Seawall Crossing</small></span></div><div><i className="green">✓</i><span><strong>Session Completed</strong><small>09:07 AM · Harbor Marina</small></span></div></section>
+      </main>
+      <aside id="comments" className="community-notes">
+        <header><h2>Community Notes</h2><span>{comments.length} Notes</span></header>
+        {comments.map((comment, index) => <article key={comment.id}><small>{comment.isOwner ? 'YOUR NOTE' : index ? '☆ HIDDEN GEM' : '⌖ TRAIL CONDITION'}</small><p>“{comment.body}”</p><footer>{comment.isOwner ? 'Just now by You' : `${index ? '5h' : '2h'} ago by ${comment.user.profile?.displayName ?? comment.user.username}`}<span>{comment.isOwner && <button className="delete-note" onClick={() => { setComments(current => current.filter(value => value.id !== comment.id)); notify('Note deleted.'); }}>Delete</button>}<button className={helpful.includes(comment.id) ? 'helpful' : ''} aria-pressed={helpful.includes(comment.id)} onClick={() => setHelpful(current => current.includes(comment.id) ? current.filter(value => value !== comment.id) : [...current, comment.id])}>♧ {helpful.includes(comment.id) ? 'Helpful!' : 'Helpful'}</button></span></footer></article>)}
+        <form onSubmit={addComment}><label className="sr-only" htmlFor="comment">Add a note</label><input id="comment" value={body} onChange={event => setBody(event.target.value)} maxLength={500} placeholder="Add a note…" /><button disabled={sending}>{sending ? '…' : '＋ Add a note'}</button></form>
+      </aside>
+    </div>
+    <section className="desktop-session-summary"><h2>Morning Ridge Run</h2><p>October 14, 2023 · 08:30 AM</p><div><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>Pace</small><strong>{formatPace(activity.distanceM, activity.durationS)}</strong></span><span><small>Elevation</small><strong>312 m</strong></span></div></section>
   </section>;
 }
-
-function FeedSkeleton() { return <div className="card skeleton"><span /><span /><span /></div>; }

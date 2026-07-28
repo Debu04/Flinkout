@@ -1,0 +1,296 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Flinkout - Discover Your Trail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#c8eadf",
+                    "surface-tint": "#46645c",
+                    "secondary-fixed-dim": "#a7c8ff",
+                    "inverse-on-surface": "#f0f1f0",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "surface-container-high": "#e7e8e7",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#2e3131",
+                    "surface-dim": "#d9dad9",
+                    "surface-variant": "#e1e3e2",
+                    "secondary-container": "#9ec2fe",
+                    "secondary-fixed": "#d5e3ff",
+                    "on-tertiary-fixed-variant": "#832600",
+                    "on-tertiary-fixed": "#390c00",
+                    "outline": "#717976",
+                    "error": "#ba1a1a",
+                    "secondary": "#395f94",
+                    "surface": "#f9f9f8",
+                    "on-tertiary-container": "#ff9976",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#f9f9f8",
+                    "inverse-primary": "#adcec3",
+                    "on-primary-fixed-variant": "#2e4c44",
+                    "on-primary-fixed": "#01201a",
+                    "outline-variant": "#c1c8c4",
+                    "on-primary": "#ffffff",
+                    "tertiary-container": "#812600",
+                    "on-background": "#191c1c",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface-variant": "#414846",
+                    "tertiary": "#5b1800",
+                    "primary-fixed-dim": "#adcec3",
+                    "surface-container-low": "#f3f4f3",
+                    "primary": "#16342d",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "background": "#f9f9f8",
+                    "tertiary-fixed": "#ffdbd0",
+                    "surface-container-highest": "#e1e3e2",
+                    "on-secondary": "#ffffff",
+                    "surface-container": "#edeeed",
+                    "on-surface": "#191c1c",
+                    "on-secondary-fixed": "#001c3b",
+                    "primary-container": "#2d4b43",
+                    "on-secondary-fixed-variant": "#1e477b",
+                    "on-secondary-container": "#284f83",
+                    "on-primary-container": "#99bab0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "sm": "12px",
+                    "base": "8px",
+                    "md": "24px",
+                    "xl": "64px",
+                    "lg": "40px",
+                    "gutter": "16px",
+                    "container-max": "1200px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Be Vietnam Pro"],
+                    "label-caps": ["Space Grotesk"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "data-mono": ["Space Grotesk"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            background-color: #f9f9f8;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(225, 227, 226, 0.5);
+        }
+        .search-inner-shadow {
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm h-16 flex justify-between items-center px-gutter"><div class="flex items-center gap-sm"><button class="p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all"><span class="material-symbols-outlined text-primary">menu</span></button><h1 class="font-headline-md text-headline-md font-extrabold text-primary tracking-tight">Flinkout</h1></div><div class="flex items-center gap-sm"><button class="relative p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all"><span class="material-symbols-outlined text-primary">notifications</span><span class="absolute top-2 right-2 w-2.5 h-2.5 bg-error border-2 border-surface rounded-full"></span></button><div class="w-10 h-10 rounded-full border-2 border-primary-container overflow-hidden active:scale-95 transition-transform cursor-pointer"><img class="w-full h-full object-cover" data-alt="A close-up professional profile portrait of a smiling young explorer wearing outdoor gear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfB2OaNpqXtQ1KQEMFmPcnzaVN9AqExaxEwo84uZYGUhWbbRNVfrrezo_H-QUBPpa5CBDvdm4SoSWcove6QouUNsTk12K3aIJbKxJ_cXu83M1cB_kObQABxDQYq5cbvISZFULzNVkFcsfB15oHq8y3YsEKWp4h92EUorSXzfx1GXs6d4zH4APPG7GFJ5u3g_hzsotnwJNcrT4YA6g9RXSM3AEYZ7r-Rp2fL_YGscsSqNEYOWDsipbgOwbLs7h1_GTIT9riBpo5gbUT"></div></div></header>
+<main class="pt-16 pb-24 min-h-screen">
+<!-- Search Bar Section -->
+<section class="px-gutter pt-6 pb-2">
+  <div class="flex gap-2 overflow-x-auto no-scrollbar">
+    <button class="flex-shrink-0 px-5 py-3 bg-primary text-on-primary rounded-full font-label-caps text-[12px] active:scale-95 transition-transform">
+      All Vibes
+    </button>
+    <button class="flex-shrink-0 px-5 py-3 bg-surface-container-high text-on-surface-variant rounded-full font-label-caps text-[12px] active:scale-95 transition-transform">
+      Distance &lt; 5km
+    </button>
+    <button class="flex-shrink-0 px-5 py-3 bg-surface-container-high text-on-surface-variant rounded-full font-label-caps text-[12px] active:scale-95 transition-transform">
+      Time: Morning
+    </button>
+    <button class="flex-shrink-0 px-5 py-3 bg-surface-container-high text-on-surface-variant rounded-full font-label-caps text-[12px] active:scale-95 transition-transform">
+      Dog Friendly
+    </button>
+  </div>
+</section><section class="px-gutter pt-6">
+<div class="relative flex items-center group">
+<span class="material-symbols-outlined absolute left-4 text-on-surface-variant transition-colors group-focus-within:text-primary" data-icon="search">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-4 pl-12 pr-4 text-body-md focus:ring-2 focus:ring-primary/20 placeholder:text-on-surface-variant/60 search-inner-shadow" placeholder="Search people, routes, or buddies..." type="text">
+</div>
+</section>
+<!-- Recent Searches -->
+<section class="px-gutter mt-8">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-headline-md text-headline-md text-primary">Recent Searches</h3>
+<button class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary transition-colors">CLEAR ALL</button>
+</div>
+<div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+<span class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-container-high rounded-full text-body-md text-on-surface-variant whitespace-nowrap active:scale-95 transition-transform">
+                    #LakeviewPath <span class="material-symbols-outlined text-[16px]" data-icon="close">close</span>
+</span>
+<span class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-container-high rounded-full text-body-md text-on-surface-variant whitespace-nowrap active:scale-95 transition-transform">
+                    @marcus_moves <span class="material-symbols-outlined text-[16px]" data-icon="close">close</span>
+</span>
+<span class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-container-high rounded-full text-body-md text-on-surface-variant whitespace-nowrap active:scale-95 transition-transform">
+                    StrollerFriendly <span class="material-symbols-outlined text-[16px]" data-icon="close">close</span>
+</span>
+</div>
+</section>
+<!-- Suggested Buddies -->
+<section class="mt-10 px-gutter">
+<h3 class="font-headline-md text-headline-md text-primary mb-5">Suggested Buddies</h3>
+<div class="space-y-4">
+<!-- Buddy 1 (Live) -->
+<div class="glass-card p-4 rounded-xl flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="A portrait of a vibrant young man with an athletic build, wearing outdoor gear, smiling warmly in a sun-drenched park. The lighting is soft and natural, emphasizing a friendly community atmosphere. The background shows blurred greenery and a park trail, following the Flinkout modern tactile aesthetic with soft forest green and warm neutral tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv-WxEASELt1QXGxDDEQcDqB-B-1yHIM-qPGue1cRbkTULrLfyv5OB0lomfiigs2OFpLfPWqaO-feOTRyD8gJoVFfgQj-mnhYSPk-FrtJ_cpfj8Kw8ElXjA2YtwaPT4EdNCNxxJ-05KkRrrulAtM8FIAbJfPSdkDTEYrEHI4N_MMskotamP0zO7-Wf4eynucRzrZ7uC_-koO6NycvqeWI6NyNCo54F-kkz9TPo-J87mTXdnahcfhKEpEdxhAlrPxTZjdkh_hj_GU6M">
+<span class="absolute -bottom-1 -right-1 bg-error text-on-error text-[8px] font-bold px-1.5 py-0.5 rounded-full border-2 border-surface">LIVE</span>
+</div>
+<div>
+<p class="font-body-md font-bold text-on-surface">@marcus_moves</p>
+<p class="text-label-caps text-on-surface-variant uppercase tracking-wider">12.4km this week</p>
+</div>
+</div>
+<button class="bg-primary text-on-primary px-5 py-2 rounded-lg font-label-caps text-label-caps active:scale-95 transition-all">FOLLOW</button>
+</div>
+<!-- Buddy 2 -->
+<div class="glass-card p-4 rounded-xl flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-3">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="A portrait of an active woman in her thirties, wearing a breathable light grey running top, with a serene expression. She is outdoors at dawn, with a soft morning haze and golden-hour lighting illuminating her face. The style is modern minimalist, with clean lines and an organic, welcoming feel typical of the Flinkout design language." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDT5A-irNzI7J_Fxdh_TCjM73rwTx2wN5Uct3Cq_QunFw2Vvoz8mHL2Hjr_fkXUNQz04lfEMV7j6UC98ppHzxRcpx0FZyntWKyD2Vk22xBj81YOfNfYkhli0QGJuH0Z4vyZoYSvHW9J06YJ1bQ-5-ivPhTVFVNYkBP_fr0K7IE3nfDr9tnoQcUzsqnHQNF1DTfRAmtbVbjLdNWt7L2HBuYzqTi70SoknPrpQlLNVwIUBjrxqO-Np5kPzSvWvEkKtX9DAHyaWgBdK5E9">
+<div>
+<p class="font-body-md font-bold text-on-surface">@trail_seeker</p>
+<p class="text-label-caps text-on-surface-variant uppercase tracking-wider">8 walks shared</p>
+</div>
+</div>
+<button class="bg-primary text-on-primary px-5 py-2 rounded-lg font-label-caps text-label-caps active:scale-95 transition-all">FOLLOW</button>
+</div>
+<!-- Buddy 3 -->
+<div class="glass-card p-4 rounded-xl flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-3">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="A smiling man in high-quality outdoor apparel, holding a trekking pole, set against a backdrop of a crisp, clear morning in a pine forest. The lighting is bright and high-key, reinforcing a light-mode aesthetic. The color palette features deep forest greens and earth tones, presenting a grounded and reliable explorer persona." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKFZgaM18L_xkGCjh803n78qDgqqxzCe38XhWLf7rJ2d0WAuCu9oPbV48L7cxpr3pfz3fp5xHX7yz9UI2-HD1_CcjjhYGSlCzFFPaSY67bfANvuk0p_kcMwgUIC1p5nPb4u5be6wZ91Nzc14VYHhCJWUhuGwMJjpZ46TJvPZzB7zvsBK6gegrrt9zGjaCpO0LaUzT6xQ2oGfbHHP2dxlEezmqPwySt8A6U1_KYDtBGO853LzPiHw-uzvVTQrwuQqUGN1Zcod_WpSdA">
+<div>
+<p class="font-body-md font-bold text-on-surface">@hiking_henry</p>
+<p class="text-label-caps text-on-surface-variant uppercase tracking-wider">Loves #DogFriendly</p>
+</div>
+</div>
+<button class="bg-primary text-on-primary px-5 py-2 rounded-lg font-label-caps text-label-caps active:scale-95 transition-all">FOLLOW</button>
+</div>
+</div>
+</section>
+<!-- Trending Nearby (Bento-lite grid) -->
+<section class="mt-10 px-gutter">
+<h3 class="font-headline-md text-headline-md text-primary mb-5">Trending Nearby</h3>
+<div class="grid grid-cols-2 gap-4">
+<!-- Route Card 1 -->
+<div class="glass-card rounded-xl overflow-hidden shadow-sm active:scale-[0.98] transition-transform">
+<div class="h-24 relative bg-primary-fixed/30 flex items-center justify-center p-4">
+<!-- Simulated Polyline using SVG -->
+<svg class="w-full h-full stroke-primary fill-none stroke-[3] opacity-60" viewBox="0 0 100 60">
+<path d="M10,50 Q30,10 50,40 T90,20" stroke-linecap="round"></path>
+</svg>
+<span class="absolute top-2 right-2 bg-surface-container-lowest/80 backdrop-blur-sm px-2 py-0.5 rounded-full text-label-caps text-primary text-[10px]">EASY</span>
+</div>
+<div class="p-3">
+<p class="font-body-md font-bold text-primary truncate">Canyon Rim Loop</p>
+<div class="flex items-center justify-between mt-1">
+<span class="text-data-mono font-data-mono text-on-surface-variant">4.2 km</span>
+<span class="material-symbols-outlined text-[16px] text-secondary" data-icon="trending_up">trending_up</span>
+</div>
+</div>
+</div>
+<!-- Route Card 2 -->
+<div class="glass-card rounded-xl overflow-hidden shadow-sm active:scale-[0.98] transition-transform">
+<div class="h-24 relative bg-secondary-fixed/30 flex items-center justify-center p-4">
+<svg class="w-full h-full stroke-secondary fill-none stroke-[3] opacity-60" viewBox="0 0 100 60">
+<path d="M10,20 C40,20 40,50 90,50" stroke-linecap="round"></path>
+</svg>
+<span class="absolute top-2 right-2 bg-surface-container-lowest/80 backdrop-blur-sm px-2 py-0.5 rounded-full text-label-caps text-primary text-[10px]">SCENIC</span>
+</div>
+<div class="p-3">
+<p class="font-body-md font-bold text-primary truncate">Lakeview Path</p>
+<div class="flex items-center justify-between mt-1">
+<span class="text-data-mono font-data-mono text-on-surface-variant">2.8 km</span>
+<span class="material-symbols-outlined text-[16px] text-secondary" data-icon="water_drop">water_drop</span>
+</div>
+</div>
+</div>
+<!-- Large Featured Card -->
+<div class="col-span-2 glass-card rounded-xl overflow-hidden shadow-sm p-4 flex items-center gap-4 active:scale-[0.99] transition-transform">
+<div class="w-20 h-20 bg-tertiary-fixed rounded-lg flex-shrink-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary-container text-4xl" data-icon="landscape" style="font-variation-settings: 'FILL' 1;">landscape</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<h4 class="font-headline-md text-headline-md text-primary text-lg">Summit Ridge</h4>
+<span class="bg-tertiary-container text-on-tertiary px-2 py-0.5 rounded text-[10px] font-bold">TOP RATED</span>
+</div>
+<p class="text-body-md text-on-surface-variant mt-1 leading-tight">A challenging climb with rewarding 360° views of the valley.</p>
+<div class="flex gap-4 mt-2">
+<span class="text-data-mono text-[12px] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> 1h 45m</span>
+<span class="text-data-mono text-[12px] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="height">height</span> +340m</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main><button class="fixed bottom-[104px] right-4 z-50 bg-primary text-on-primary flex items-center gap-2 px-6 py-3 rounded-full shadow-lg active:scale-95 transition-transform"><span class="material-symbols-outlined">directions_walk</span><span class="font-label-caps text-sm tracking-widest uppercase">Start</span></button>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-lg shadow-[0_-4px_12px_rgba(0,0,0,0.05)] flex justify-around items-center h-20 px-4"><a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">home</span><span class="font-label-caps text-[10px]">Home</span></a><a class="flex flex-col items-center justify-center text-primary bg-primary-container/30 rounded-xl px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">search</span><span class="font-label-caps text-[10px]">Search</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">map</span><span class="font-label-caps text-[10px]">Map</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">mail</span><span class="font-label-caps text-[10px]">Messages</span></a></nav>
+<script>
+        // Simple micro-interaction for follow buttons
+        document.querySelectorAll('button').forEach(button => {
+            if (button.innerText === 'FOLLOW') {
+                button.addEventListener('click', function() {
+                    const isFollowing = this.getAttribute('data-following') === 'true';
+                    if (isFollowing) {
+                        this.innerText = 'FOLLOW';
+                        this.classList.remove('bg-surface-variant', 'text-on-surface-variant');
+                        this.classList.add('bg-primary', 'text-on-primary');
+                        this.setAttribute('data-following', 'false');
+                    } else {
+                        this.innerText = 'FOLLOWING';
+                        this.classList.remove('bg-primary', 'text-on-primary');
+                        this.classList.add('bg-surface-variant', 'text-on-surface-variant');
+                        this.setAttribute('data-following', 'true');
+                    }
+                });
+            }
+        });
+    </script>
+
+
+
+
+</body></html>

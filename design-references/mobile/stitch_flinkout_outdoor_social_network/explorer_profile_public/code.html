@@ -1,0 +1,357 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Public Profile - Marcus Rivera</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .stats-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .glass-card {
+            backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.8);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#f9f9f8",
+                      "surface-container-highest": "#e1e3e2",
+                      "on-primary": "#ffffff",
+                      "surface-tint": "#46645c",
+                      "on-tertiary-container": "#ff9976",
+                      "on-error-container": "#93000a",
+                      "tertiary-container": "#812600",
+                      "secondary-fixed": "#d5e3ff",
+                      "error-container": "#ffdad6",
+                      "primary-fixed-dim": "#adcec3",
+                      "on-secondary": "#ffffff",
+                      "error": "#ba1a1a",
+                      "primary": "#16342d",
+                      "tertiary-fixed": "#ffdbd0",
+                      "primary-container": "#2d4b43",
+                      "outline-variant": "#c1c8c4",
+                      "on-surface-variant": "#414846",
+                      "on-primary-fixed-variant": "#2e4c44",
+                      "on-secondary-container": "#284f83",
+                      "on-primary-fixed": "#01201a",
+                      "primary-fixed": "#c8eadf",
+                      "on-error": "#ffffff",
+                      "on-background": "#191c1c",
+                      "secondary": "#395f94",
+                      "on-tertiary-fixed-variant": "#832600",
+                      "on-secondary-fixed": "#001c3b",
+                      "surface-container-high": "#e7e8e7",
+                      "inverse-surface": "#2e3131",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-on-surface": "#f0f1f0",
+                      "secondary-container": "#9ec2fe",
+                      "on-surface": "#191c1c",
+                      "tertiary-fixed-dim": "#ffb59d",
+                      "surface-dim": "#d9dad9",
+                      "outline": "#717976",
+                      "on-tertiary-fixed": "#390c00",
+                      "tertiary": "#5b1800",
+                      "surface-container": "#edeeed",
+                      "secondary-fixed-dim": "#a7c8ff",
+                      "on-secondary-fixed-variant": "#1e477b",
+                      "surface-variant": "#e1e3e2",
+                      "on-tertiary": "#ffffff",
+                      "on-primary-container": "#99bab0",
+                      "inverse-primary": "#adcec3",
+                      "surface-container-low": "#f3f4f3",
+                      "background": "#f9f9f8",
+                      "surface": "#f9f9f8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "md": "24px",
+                      "gutter": "16px",
+                      "base": "8px",
+                      "xl": "64px",
+                      "container-max": "1200px",
+                      "sm": "12px",
+                      "xs": "4px",
+                      "lg": "40px"
+              },
+              "fontFamily": {
+                      "headline-lg-mobile": ["Be Vietnam Pro"],
+                      "headline-lg": ["Be Vietnam Pro"],
+                      "display-lg": ["Be Vietnam Pro"],
+                      "headline-md": ["Be Vietnam Pro"],
+                      "label-caps": ["Space Grotesk"],
+                      "body-md": ["Be Vietnam Pro"],
+                      "body-lg": ["Be Vietnam Pro"],
+                      "data-mono": ["Space Grotesk"]
+              },
+              "fontSize": {
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-bright text-on-surface pb-32">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-gutter">
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant/50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile text-primary">Public Profile</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant/50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="A professional close-up headshot of a friendly man named Marcus Rivera, an outdoor enthusiast. He has a warm smile, wearing a high-quality forest green tactical hiking jacket. The lighting is natural, golden hour sunlight in a scenic California park background. The style is clean, modern, and trustworthy, fitting a social fitness app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBc3jSVz8bzqssMd_1UQb8DDjGQxz3URgwRh1-g31fZ90IJOtKiwFT7uFA9bS9NGKq3BOiqBpkdfyKcsG2ShamD2kzHGfsWYl40zuUdT7tYuxLfuaP69NF9zGnW63bzDoOA4J9MFIS58D1ZxSpEXR7zSkQzX8yWZbJR3Ka6Yv8CjBgO2wFjZsi_KNlOSgpxnWY50Un9lafoBGC-Rl8gXNVx_aNxsUbauULwuxwq0QWuxedA3Rl2DZI9XEwu_1evb8ALfao5n3qamCPR">
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="mt-20 px-gutter">
+<!-- Profile Header Section -->
+<section class="flex flex-col items-center text-center mt-base">
+<div class="relative mb-4">
+<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-surface-container-lowest shadow-lg">
+<img class="w-full h-full object-cover" data-alt="A large, vibrant circular profile portrait of Marcus Rivera. He is in his early 30s, looking energetic and friendly, set against a blurred background of a lush trail in Los Angeles. The image quality is sharp with a soft ambient glow that highlights his skin and premium outdoor gear. The overall aesthetic is bright, professional, and inviting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMSgaQdnJetN5WhX77b1I3mPPBq1vqTZXz8q5X41118j-P1ngKnfEawQCsE_4psyHlXLraK36Lg6olZeM-xw0sxNnoWEBZipWHUHhYP5-0y83GzO8oYF0xYoymvzZCMMfYAV91khx9gRUKiq5viECcIc7Z4lOkyXPeymu2uu2fFbsK065OR5zBEGV10tGfha8DG8hjB03InuaBXGxPwb0dVQ_nWtaHAd_V7QwHT1QwynA3pt2ribqlswwr1nmPSPwQduqxzQzt1Q7s">
+</div>
+<div class="absolute bottom-0 right-0 bg-primary text-on-primary w-8 h-8 rounded-full flex items-center justify-center border-2 border-surface-container-lowest">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-primary mb-1">Marcus Rivera</h2>
+<div class="flex items-center gap-1.5 mb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">@marcus_trails</span>
+<span class="text-outline-variant">•</span>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px] text-secondary">location_on</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Los Angeles, CA</span>
+</div>
+</div>
+<button class="mt-4 w-full max-w-[240px] bg-primary text-on-primary font-bold py-3 px-8 rounded-lg active:scale-95 transition-all shadow-md">
+                Follow
+            </button>
+</section>
+<!-- Stats Bento Grid -->
+<section class="mt-lg grid grid-cols-3 gap-3">
+<div class="bg-surface-container-low p-4 rounded-xl flex flex-col items-center justify-center border border-outline-variant/20">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Activities</span>
+<span class="font-data-mono text-headline-md text-primary stats-font">128</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex flex-col items-center justify-center border border-outline-variant/20">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">Total Distance</span>
+<span class="font-data-mono text-headline-md text-primary stats-font">842 <span class="text-sm">km</span></span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex flex-col items-center justify-center border border-outline-variant/20">
+<div class="flex items-center gap-1 mb-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Streak</span>
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<span class="font-data-mono text-headline-md text-primary stats-font">12 <span class="text-sm">Days</span></span>
+</div>
+</section>
+<!-- Recent Movement Feed -->
+<section class="mt-lg">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-headline-md text-primary">Recent Movement</h3>
+<button class="text-secondary font-bold text-sm">View all</button>
+</div>
+<div class="flex flex-col gap-gutter">
+<!-- Activity Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 flex flex-col">
+<div class="relative h-32 bg-surface-container-highest">
+<div class="absolute inset-0 opacity-80" data-alt="A stylized miniature map route overlay of a hiking trail through Griffith Park, Los Angeles. A bright Electric Lime polyline depicts a complex path winding through the topography. The map style is clean, light-themed, with subtle mountain shading and organic greens, creating a focused, high-contrast visual for a fitness app profile." data-location="Griffith Park, Los Angeles" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAKm7Kj4c7L-ynTTQPVtlCNUtRXpdcRFmK8U8PFBz7qUkTKL8B2WZ2TUsNIQ5ii3o7l0Opx4V7Ee6Bz9-kMP5HG0j98AJaJN0gAr7X68s385w05Hhjao9qbIaevifpLEo9sc4DMQU_qnUokvSu4OHBsuusmvxOnI7ZnyRDuj5aRCdIuV_4BDGrl8Kmvksw5avT_slDsY2Pbr2cJ5-o7wSl5Yf3AOXxfRpBsskVWsbVav5OCyYosBKyU-0SEOm8sKf1RDE9ROzWYYCW4')"></div>
+<div class="absolute top-3 right-3 bg-surface/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm border border-outline-variant/20">
+<span class="material-symbols-outlined text-primary text-[14px]" style="font-variation-settings: 'FILL' 1;">directions_walk</span>
+<span class="font-label-caps text-[10px] text-primary">TRAIL WALK</span>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h4 class="font-bold text-primary text-body-lg mb-1">Morning Griffith Loop</h4>
+<p class="text-on-surface-variant text-sm">Yesterday • 08:42 AM</p>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface-container-lowest bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small round user avatar profile picture of a friend." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkv6o0gzXQbgkgtdmntbbRkJe6oRBGfCSUVyDYuZE-i80UnmWUVXHHAa39fwSU4HkSKPJAxoZ0AsB2hmWuS4JkQ_-Bk04HXnnec2lNTFsRjGW88SBbNJSBhGd0fUDBpvsad7u1ncgMJz2Lui0v2bIBO7HNiP2oytWVR3XYx__RjizGt8dxQWQC1PpOvljxz1HQmJo9pYtaIpxQFH2IQYIKgwrJxnpPKFMbNO4qXkR3eT5ov3djSJoIsbausVy49LO56VxEdQXVLZUh">
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface-container-lowest bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small round user avatar profile picture of another friend." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrdMEA0WAzdPYAEmr7rCltfmv513CEGTAYqq89sC3vnnbEGpXnd1MWXmqOaJWddR6UQSFCDFDtf6T26Eca6V6BKgTbSVLiU5BLHMx3WSJlK1AwKFpZj7ouxLqE-_6KW0jfut3rFiVklBH_JACb-BFmBSrH8cvSUPW8b3pLfloVtYiT9HpOQ5XpUAQSGTY0mer1s49RaivGpiz7nt9RuNExGoL6AMUL8HBA2cwUa3mQjMwasxqucXL8gKIUlZJfvbTI9pgWpemQXvbN">
+</div>
+</div>
+<span class="text-on-surface-variant text-xs font-medium">+14</span>
+</div>
+</div>
+<div class="flex items-center gap-6 py-2 border-t border-surface-container text-primary">
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Distance</span>
+<span class="font-data-mono text-body-lg stats-font">6.2 km</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Time</span>
+<span class="font-data-mono text-body-lg stats-font">1h 20m</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Pace</span>
+<span class="font-data-mono text-body-lg stats-font">12'54"</span>
+</div>
+</div>
+<div class="flex items-center gap-4 mt-3 pt-3 border-t border-surface-container">
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">local_fire_department</span>
+<span class="text-xs font-bold">12</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+<span class="text-xs font-bold">4</span>
+</button>
+<button class="ml-auto text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Activity Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 flex flex-col">
+<div class="relative h-32 bg-surface-container-highest">
+<div class="absolute inset-0 opacity-80" data-alt="A clean, minimalist map route of a coastal walk along Santa Monica beach. The background shows soft blue water textures and light sand tones. A vibrant Electric Lime line traces the shoreline path. The map feels open and airy, using the Flinkout Trailside design aesthetic with clear typography and soft ambient lighting." data-location="Santa Monica Beach, CA" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA0AypawIFeRQ4lu0Ohn0FG9ssUyrRiWtstRQHpcNxLL7QggSNm2q4mumJhv5Ka7La05v4MqjdibobLB1UXvzQNR_DeYtQzdUAVRyxYp0UqUAr4yzGxIFaloDhdaUoaxWQyGNOCUc8xabXZ_ZYZai1kTlowBh2s1Z5Sp4bsOOz57g_7qP8EYdxzd3tAZPXkBl6-8ZMkSrfGi3mvY6Ls1el3q3KD9bdlKFMxJtXjQP0_8Bk_y55I67kaxw48ETdiELa-ab8iTDVwcOrA')"></div>
+<div class="absolute top-3 right-3 bg-surface/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm border border-outline-variant/20">
+<span class="material-symbols-outlined text-primary text-[14px]" style="font-variation-settings: 'FILL' 1;">beach_access</span>
+<span class="font-label-caps text-[10px] text-primary">COASTAL WALK</span>
+</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h4 class="font-bold text-primary text-body-lg mb-1">Sunset Promenade</h4>
+<p class="text-on-surface-variant text-sm">3 days ago • 05:15 PM</p>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-low text-primary">
+<span class="material-symbols-outlined text-sm">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-6 py-2 border-t border-surface-container text-primary">
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Distance</span>
+<span class="font-data-mono text-body-lg stats-font">4.5 km</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Time</span>
+<span class="font-data-mono text-body-lg stats-font">55m</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Pace</span>
+<span class="font-data-mono text-body-lg stats-font">12'13"</span>
+</div>
+</div>
+<div class="flex items-center gap-4 mt-3 pt-3 border-t border-surface-container">
+<button class="flex items-center gap-1.5 text-tertiary">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="text-xs font-bold">28</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+<span class="text-xs font-bold">8</span>
+</button>
+<button class="ml-auto text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- FAB: Start Activity -->
+<button class="fixed bottom-24 right-6 w-16 h-16 rounded-full bg-primary text-on-primary shadow-xl z-50 flex flex-col items-center justify-center active:scale-90 transition-transform hover:bg-primary-container">
+<span class="material-symbols-outlined text-2xl mb-0.5">directions_walk</span>
+<span class="font-label-caps text-[10px] tracking-widest">START</span>
+</button>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md border-t border-outline-variant/30 flex justify-around items-center px-4 pb-4 pt-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-caps text-label-caps uppercase">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">search</span>
+<span class="font-label-caps text-label-caps uppercase">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">map</span>
+<span class="font-label-caps text-label-caps uppercase">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">chat_bubble</span>
+<span class="font-label-caps text-label-caps uppercase">Messages</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction for social buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('touchstart', function() {
+                this.classList.add('scale-95');
+            });
+            btn.addEventListener('touchend', function() {
+                this.classList.remove('scale-95');
+            });
+        });
+
+        // Simple scroll reveal for cards
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-4');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.bg-surface-container-lowest').forEach(card => {
+            card.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-4');
+            observer.observe(card);
+        });
+    </script>
+</body></html>

@@ -1,0 +1,611 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Flinkout | Hybrid Feed</title>
+<!-- Google Fonts: Space Grotesk & Be Vietnam Pro -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Custom Scrollbar for Trailside feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c8c4;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #717976;
+        }
+        .glass-panel {
+            background: rgba(249, 249, 248, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#46645c",
+                        "surface-container-highest": "#e1e3e2",
+                        "surface-dim": "#d9dad9",
+                        "primary-fixed": "#c8eadf",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-background": "#191c1c",
+                        "primary-fixed-dim": "#adcec3",
+                        "on-primary-fixed-variant": "#2e4c44",
+                        "inverse-surface": "#2e3131",
+                        "outline": "#717976",
+                        "on-secondary-fixed": "#001c3b",
+                        "tertiary-container": "#812600",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f9f9f8",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#f0f1f0",
+                        "tertiary-fixed": "#ffdbd0",
+                        "surface": "#f9f9f8",
+                        "secondary": "#395f94",
+                        "primary": "#16342d",
+                        "surface-bright": "#f9f9f8",
+                        "surface-container-high": "#e7e8e7",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#1e477b",
+                        "outline-variant": "#c1c8c4",
+                        "on-tertiary-fixed-variant": "#832600",
+                        "secondary-fixed": "#d5e3ff",
+                        "on-tertiary-container": "#ff9976",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e2",
+                        "secondary-fixed-dim": "#a7c8ff",
+                        "on-primary-fixed": "#01201a",
+                        "on-secondary-container": "#284f83",
+                        "on-tertiary-fixed": "#390c00",
+                        "secondary-container": "#9ec2fe",
+                        "tertiary": "#5b1800",
+                        "inverse-primary": "#adcec3",
+                        "surface-container-low": "#f3f4f3",
+                        "primary-container": "#2d4b43",
+                        "on-surface-variant": "#414846",
+                        "surface-container": "#edeeed",
+                        "on-surface": "#191c1c",
+                        "on-primary-container": "#99bab0",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "base": "8px",
+                        "lg": "40px",
+                        "xs": "4px",
+                        "xl": "64px",
+                        "gutter": "16px",
+                        "container-max": "1200px",
+                        "sm": "12px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Space Grotesk"],
+                        "headline-md": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "data-mono": ["Space Grotesk"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "display-lg": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md selection:bg-primary-fixed selection:text-on-primary-fixed">
+<div class="flex min-h-screen max-w-container-max mx-auto overflow-hidden">
+<!-- SideNavBar (Left Sidebar) -->
+<aside class="h-screen w-64 hidden md:flex flex-col fixed left-0 top-[72px] bg-surface border-r border-outline-variant p-md gap-base">
+<div class="flex flex-col gap-xs mb-md">
+<div class="w-12 h-12 rounded-full overflow-hidden mb-2">
+<img class="w-full h-full object-cover" data-alt="A close-up portrait of an active outdoor enthusiast with messy hair and a warm smile, wearing modern athletic gear. The background is a soft, blurred evergreen forest at dawn with golden morning light filtering through. The overall style is clean, approachable, and adventurous." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGKEGgUGQ1vbbJzuJ9t0F1-VkGoJxbH2SJBqvN-5kyJ9-l21tx1bkyv_dBsHfmDJ6fbv8ECnin_jCws2_2_VhrJB4H66G9DRfh0nODjkyAcCaLWTWEmMU8AlX44rkrj3Oj_yLWCHfe68xOhySkW3lkCcPXgiP7VJXvEpSvkCjN7yMicQR_D8ZBswHz_oTei5DqVDogvC063E4nQAOseDxu1XVzG0o_4t2T5Pun18F3CzoHrQgH0r3MadwOt2rsE5JKbAe_wBYYQ0DD">
+</div>
+<h3 class="font-headline-md text-[18px] font-bold text-primary">Outdoor Explorer</h3>
+<p class="text-on-surface-variant text-[14px]">Level 12 Trailblazer</p>
+</div>
+<nav class="flex flex-col gap-xs flex-grow">
+<a class="flex items-center gap-sm p-sm text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">radar</span>
+<span class="font-body-md">Live Map</span>
+</a>
+<a class="flex items-center gap-sm p-sm bg-secondary-container text-on-secondary-container rounded-lg font-bold" href="#">
+<span class="material-symbols-outlined">travel_explore</span>
+<span class="font-body-md">Session Finder</span>
+</a>
+<a class="flex items-center gap-sm p-sm text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">speed</span>
+<span class="font-body-md">My Activity</span>
+</a>
+<a class="flex items-center gap-sm p-sm text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-body-md">Clubs</span>
+</a>
+<a class="flex items-center gap-sm p-sm text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md">Settings</span>
+</a><button class="mt-base w-full bg-primary text-on-primary py-sm px-md rounded-lg font-bold flex items-center justify-center gap-xs active:translate-x-1 transition-transform">
+
+<span class="font-body-md">Start Activity</span>
+</button>
+</nav>
+<button class="mt-auto w-full bg-primary text-on-primary py-sm px-md rounded-lg font-bold flex items-center justify-center gap-xs active:translate-x-1 transition-transform">
+<span class="material-symbols-outlined">play_arrow</span>
+                Start Live Session
+            </button>
+</aside>
+<!-- Main Content (Center + Right) -->
+<main class="flex-grow flex flex-col min-h-screen overflow-y-auto md:ml-64">
+<!-- TopNavBar (Search & Actions) -->
+<header class="sticky top-0 z-50 glass-panel border-b border-outline-variant/30 px-gutter py-base w-full">
+<div class="flex justify-between items-center w-full">
+<div class="flex-grow max-w-md">
+<div class="relative flex items-center group">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary-container text-body-md transition-all" placeholder="Explore trails, groups, or friends..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-md ml-gutter">
+<button class="p-2 rounded-full hover:bg-surface-variant transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">chat_bubble</span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</div>
+</header>
+<div class="flex flex-col lg:flex-row w-full p-gutter gap-lg">
+<!-- Center Column: Main Feed -->
+<section class="flex-grow lg:w-2/3 space-y-lg">
+<!-- Live Nearby Section -->
+<div class="space-y-base">
+<div class="flex justify-between items-center px-xs">
+<h2 class="font-headline-md text-headline-md text-primary flex items-center gap-xs">
+<span class="material-symbols-outlined text-error fill text-[20px]">sensors</span>
+                                Live Nearby
+                            </h2>
+<a class="text-primary font-label-caps text-label-caps hover:underline" href="#">View All</a>
+</div>
+<div class="flex gap-md overflow-x-auto pb-4 no-scrollbar -mx-xs px-xs">
+<!-- Live Profile Item -->
+<div class="flex flex-col items-center gap-xs flex-shrink-0 cursor-pointer group">
+<div class="relative p-1 rounded-full border-2 border-error">
+<div class="w-16 h-16 rounded-full overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A portrait of a woman in athletic wear with a scenic mountain range in the background. The lighting is golden hour, creating a warm, vibrant atmosphere. High detail, high quality photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCN_otk7kytqpWmnUSBehpVOHzndIjAb_yiJbQYai1Frs7TzgGtmL6P6ql3p46_00OszXQv9coTsr-h5WaEgCWr41p9RE5AZreu_y48Fz1rZTlCtxZruqjFKSCuNjZQHnGCgoL_JB-vQmMXSbtdyULB85Ux0XMEBHu4aynDOqJ4UG0JVqqJsVYlMCFgPnuo8_RiyeEnwjkvdI0C5ns-3IwptjhwSMlN6cXWQBIqVJ-ekHrqsuglMM1zmyDTgEeolYsSx0X7waT_S2Oy">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-error text-on-error text-[10px] font-bold px-2 rounded-full shadow-sm">LIVE</div>
+</div>
+<span class="font-label-caps text-[11px] text-on-surface">Maya P.</span>
+</div>
+<!-- Live Profile Item 2 -->
+<div class="flex flex-col items-center gap-xs flex-shrink-0 cursor-pointer group">
+<div class="relative p-1 rounded-full border-2 border-error">
+<div class="w-16 h-16 rounded-full overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Close up portrait of a male hiker with a beard, wearing a green beanie, standing in a pine forest. Muted natural tones, soft lighting, professional lifestyle photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAuBWvlaWEaOehiKJKqjCr_47wpEmogqlxfGN1UAd1jHcAmc3gNtrkCQDOKCFlq50fUYfWrWXpEEXrBXsVDj8YwyV9nhmKikSNFlKRuecMYHsWxYd3aTMlLtQdfC_gDJPnXNqQcLrpFxxbYBXzSuzUpJL39mxR3PM1PL38RBypMeyfg5HqGCIFCKMbGD1InUsJ3jX-GYyXH-JeJMtamvLl0Wguq-akm_Q1gJ7zYdJZpzpIu-0miGl0D4FQDNpVE53HH752wHQEG154J">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-error text-on-error text-[10px] font-bold px-2 rounded-full shadow-sm">LIVE</div>
+</div>
+<span class="font-label-caps text-[11px] text-on-surface">Tom G.</span>
+</div>
+<!-- Live Profile Item 3 -->
+<div class="flex flex-col items-center gap-xs flex-shrink-0 cursor-pointer group">
+<div class="relative p-1 rounded-full border-2 border-error">
+<div class="w-16 h-16 rounded-full overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A youthful woman with curly hair wearing headphones and running gear. Urban park background with dappled sunlight. Friendly, active energy, high contrast aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAe3PHR8yW7Gscq2HGI6p7awfgYUjAvWnohi5lqMS87CuCQUNVd6Jr_wOFxp6s6zQhNgb8XD9Otbnuif6yV5a5akWuouWi9ZEC04zO4PSEXYFcHYSiLKCCokbEdWVV0CpwPhsrxOOjEp8GDN2y23tv3NgmrRn4UKGNZu-aC9y3gCNHwDMaDkktIztlSa0bCW5G3G_0Pt4oRr5HqzCINZ2NeRaF5yBtmGWmAuuEoKCVoLSLVln5lt-T0r_GVUqQ02incY-aMxijcTVF9">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-error text-on-error text-[10px] font-bold px-2 rounded-full shadow-sm">LIVE</div>
+</div>
+<span class="font-label-caps text-[11px] text-on-surface">Elena S.</span>
+</div>
+<!-- Live Profile Item 4 -->
+<div class="flex flex-col items-center gap-xs flex-shrink-0 cursor-pointer group">
+<div class="relative p-1 rounded-full border-2 border-error">
+<div class="w-16 h-16 rounded-full overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A man in his 40s jogging through a misty forest trail. Soft, ethereal lighting, earthy color palette, focus on motion and nature." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMd6-AjA1YfGKqfBu_GKd9ucWxQEmuxix-urWQEQrxxLScoqR9zAksrdz0iPeAjnR1zvqbVtX7EEDLeAzi1AfiQSED8nwkJLBnI-lJykE40WgKmMbZ0o5kgY0Xe1r8zPGqes_rxNMtZd3Dm7x-z0JlKLEaWqRzCFCM82m9icqVC5gZCPR5dp04pL4W4cMhaOk_F26iXjquJTwPCfftnzoOJDunnHKTK5RTwixEfwOp-1x6D_aRwd9EgX7q9RcuJzpCecJlWL4lTaDS">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-error text-on-error text-[10px] font-bold px-2 rounded-full shadow-sm">LIVE</div>
+</div>
+<span class="font-label-caps text-[11px] text-on-surface">Mark D.</span>
+</div>
+<!-- Live Profile Item 5 -->
+<div class="flex flex-col items-center gap-xs flex-shrink-0 cursor-pointer group">
+<div class="relative p-1 rounded-full border-2 border-error">
+<div class="w-16 h-16 rounded-full overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Profile of a woman cyclist with a sleek helmet and mirrored sunglasses, reflected urban environment. Sharp focus, high saturation, modern sportswear style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvTPRKOTT1wJHpL9f9nu8-M0HcM3K5YQl92faRi-4P_Er-lTZKXMPdGrpEq4reUs42uA4_VIqQ8Bbs0Yq7VK-ZMMe-VBgOaKjBY1pIaYD8vA75wvtaQMU6NyCs7lIa1gTLA3Bt1b98SW-5svLTLUA2R2RsmzygJfkTkHKRZEiCfeVhGjxa9dfZbEhOw9gNcxECUP9fuetD5PS_sRwcyUKvZ0lVtsmASnLXeHTeFQ2DY7tWqma5viTOyu0Hx2ClGFX2uHSh0DFwEa37">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-error text-on-error text-[10px] font-bold px-2 rounded-full shadow-sm">LIVE</div>
+</div>
+<span class="font-label-caps text-[11px] text-on-surface">Lara K.</span>
+</div>
+</div>
+</div>
+<!-- Main Map Feed -->
+<div class="flex flex-col gap-lg">
+<!-- Activity Card 1 -->
+<article class="bg-surface rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden flex flex-col group transition-all hover:shadow-md">
+<!-- Card Header -->
+<div class="p-gutter flex justify-between items-center">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-primary-fixed">
+<img class="w-full h-full object-cover" data-alt="A closeup shot of a joyful woman in hiking gear. Professional portrait with a shallow depth of field, featuring natural light and a soft green forest backdrop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUMTIxD1C1EdbYdQr2R0_L0RXhcYk2it84KHTK7EF76Aad0cXI2nSpuD8e5J8G0DDM7YEVwwybmKEEqTsGD3GQrQiN8QMk7uIJqnVc5byeRkagpDW-avQT-cSXlVQF42SIhURu7py4OZMvtrqqR54fbHpImkwqfLlR2WDrelCZF20jTnOVjKphbFS4bmqTjzLpYvgch7sI8Y7qdnPhIzjPLdiQvbHcxqeTvmw2mBFFE5zaAbs0Us1rVViJXqssMqkt2KIy1O28KuHx">
+</div>
+<div>
+<div class="flex items-center gap-xs">
+<span class="font-bold text-on-surface">Sienna Williams</span>
+<span class="text-on-surface-variant text-xs font-medium">• 2h ago</span>
+</div>
+<div class="flex items-center gap-xs text-[11px] text-secondary font-label-caps">
+<span class="material-symbols-outlined text-[14px]">map</span>
+                                            Silver Creek Loop
+                                        </div>
+</div>
+</div>
+<button class="p-1 rounded-full hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">more_vert</span>
+</button>
+</div>
+<!-- Interactive Map Area -->
+<div class="relative w-full aspect-[16/9] bg-surface-container-highest cursor-pointer overflow-hidden">
+<div class="absolute inset-0 opacity-80" data-location="Silver Creek, Washington">
+<img class="w-full h-full object-cover" data-alt="A stylized minimalist map view of a hiking trail loop through a dense forest. The map uses a soft trailside aesthetic with muted greens and earthy browns. A vibrant forest green polyline marks the route taken. No text on map." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcZDdQXS8SBI58YC9_fFxBXhAaMB-B_5dwfCXM89lRXYGIe9gGuXAdN_19Ax2k3RftOqQFVE4WiXpLOuKZ8n7oIszt8OAw_tMNz1d-qBjEzET9SiVEkOsu2xQA5VSRG_nM2WE0Opy6XsXdnm5yCj3yPtx5B1TUQV7UNbY4S21iMxqHFjOnxL1SqqXCaAQqeIa-KBl_1dCHn9d_SJW6LDkdg83NjlylR4k6mfR1fLHbL9W1lRX5FjwhgPGYNCXvO7aQVAJiWqQyibkr">
+</div>
+<!-- Overlay Stats -->
+<div class="absolute bottom-gutter left-gutter right-gutter flex gap-base">
+<div class="bg-surface/90 backdrop-blur-md p-base rounded-lg shadow-lg flex-grow flex justify-around border border-white/40">
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-label-caps text-on-surface-variant uppercase">Distance</span>
+<span class="font-data-mono text-body-lg font-bold text-primary">8.42 <span class="text-xs font-normal">KM</span></span>
+</div>
+<div class="w-px h-full bg-outline-variant/30"></div>
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-label-caps text-on-surface-variant uppercase">Time</span>
+<span class="font-data-mono text-body-lg font-bold text-primary">42:15</span>
+</div>
+<div class="w-px h-full bg-outline-variant/30"></div>
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-label-caps text-on-surface-variant uppercase">Pace</span>
+<span class="font-data-mono text-body-lg font-bold text-primary">5.04 <span class="text-xs font-normal">/KM</span></span>
+</div>
+</div>
+<button class="bg-primary aspect-square w-14 rounded-lg flex items-center justify-center text-on-primary shadow-lg hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined fill text-2xl">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Card Body -->
+<div class="p-gutter space-y-sm">
+<p class="text-body-md text-on-surface">
+                                    Crisp morning air and perfectly quiet trails today. Finally beat my best time on the Silver Creek ascent! 🌲✨
+                                </p>
+<div class="flex gap-xs">
+<span class="px-2 py-0.5 bg-secondary-fixed text-on-secondary-fixed text-[11px] font-label-caps rounded-full">#MorningRun</span>
+<span class="px-2 py-0.5 bg-secondary-fixed text-on-secondary-fixed text-[11px] font-label-caps rounded-full">#TrailRun</span>
+<span class="px-2 py-0.5 bg-secondary-fixed text-on-secondary-fixed text-[11px] font-label-caps rounded-full">#SoloSession</span>
+</div>
+</div>
+<!-- Card Actions -->
+<div class="px-gutter py-base border-t border-outline-variant/10 flex justify-between">
+<div class="flex gap-md">
+<button class="flex items-center gap-xs group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-error group-hover:fill transition-colors">favorite</span>
+<span class="text-label-caps text-on-surface-variant group-hover:text-on-surface">24</span>
+</button>
+<button class="flex items-center gap-xs group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">comment</span>
+<span class="text-label-caps text-on-surface-variant group-hover:text-on-surface">8</span>
+</button>
+<button class="flex items-center gap-xs group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">share</span>
+</button>
+</div>
+<button class="flex items-center gap-xs text-secondary group">
+<span class="material-symbols-outlined group-hover:fill transition-all">bookmark</span>
+</button>
+</div>
+</article>
+<!-- Activity Card 2 -->
+<article class="bg-surface rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden flex flex-col group transition-all hover:shadow-md">
+<!-- Card Header -->
+<div class="p-gutter flex justify-between items-center">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-primary-fixed">
+<img class="w-full h-full object-cover" data-alt="A portrait of a male runner in his 30s. Sharp focus on his determined expression, background is a blurred urban trail at sunrise. High contrast, warm morning lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKc9bg7kXx2IV0h_JG1K0sAOKGVE7QOYKc9MQGXidwRRoDogxRBoHofPy8lTMQYJUXg-2t1qCbOXEq4oHT7fDgELBf5TLLp7BmATicWz5qywj2TikTRwlw8WMtLRf6hHPVCsRCRoaXrSJaIYdTkXbBk1pTtnCqLgqwCV2hK-aeUU8ebPYvuggx0eaUmtl3UeXZhr_NRGS-Pz0EGri9Q1hAjYe5xrjgYMSxs9tvUx4b-XiRCf9L_8tFs-7c0giNkRa6jRLAtXKcll7R">
+</div>
+<div>
+<div class="flex items-center gap-xs">
+<span class="font-bold text-on-surface">James Chen</span>
+<span class="text-on-surface-variant text-xs font-medium">• 5h ago</span>
+</div>
+<div class="flex items-center gap-xs text-[11px] text-secondary font-label-caps">
+<span class="material-symbols-outlined text-[14px]">map</span>
+                                            Downtown Greenway
+                                        </div>
+</div>
+</div>
+<button class="p-1 rounded-full hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">more_vert</span>
+</button>
+</div>
+<!-- Interactive Map Area -->
+<div class="relative w-full aspect-[16/9] bg-surface-container-highest cursor-pointer overflow-hidden">
+<div class="absolute inset-0 opacity-80" data-location="Chicago Waterfront">
+<img class="w-full h-full object-cover" data-alt="A clean, modern top-down map illustration of an urban park area near a river. The map uses soft blue and gray tones. An electric lime polyline indicates a running path through the park. Flat design style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRLptqy8ICwIFRTSXDKIqA7cax-sYnmdgi7opLhQmklEkndWYINIdH35aIVdqay6K9OwRggQf4oDiGscn53s1Y6CENRBNEzeY85VwySv0sb5suslmDGIgy0uZzEOpB01EOzD9GcYNe107ROB6s-DwmRJLPQKmGMPvfyPFGChP-d9Sko6MpZMrgr8pc9yGxuftiVdUzhuO3-eIYwl31ualjRZ_25r86uMxX63zTxoFQnLmf0vb6IrCBprZWYmE8qG_jxrvIKKNdIC1_">
+</div>
+<!-- Overlay Stats -->
+<div class="absolute bottom-gutter left-gutter right-gutter flex gap-base">
+<div class="bg-surface/90 backdrop-blur-md p-base rounded-lg shadow-lg flex-grow flex justify-around border border-white/40">
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-label-caps text-on-surface-variant uppercase">Distance</span>
+<span class="font-data-mono text-body-lg font-bold text-primary">5.10 <span class="text-xs font-normal">KM</span></span>
+</div>
+<div class="w-px h-full bg-outline-variant/30"></div>
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-label-caps text-on-surface-variant uppercase">Time</span>
+<span class="font-data-mono text-body-lg font-bold text-primary">28:40</span>
+</div>
+<div class="w-px h-full bg-outline-variant/30"></div>
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-label-caps text-on-surface-variant uppercase">Elevation</span>
+<span class="font-data-mono text-body-lg font-bold text-primary">12 <span class="text-xs font-normal">M</span></span>
+</div>
+</div>
+<button class="bg-primary aspect-square w-14 rounded-lg flex items-center justify-center text-on-primary shadow-lg hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined fill text-2xl">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Card Body -->
+<div class="p-gutter space-y-sm">
+<p class="text-body-md text-on-surface">
+                                    Light jog before work. The waterfront is always therapeutic. Who's out this weekend?
+                                </p>
+</div>
+<!-- Card Actions -->
+<div class="px-gutter py-base border-t border-outline-variant/10 flex justify-between">
+<div class="flex gap-md">
+<button class="flex items-center gap-xs group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-error transition-colors">favorite</span>
+<span class="text-label-caps text-on-surface-variant group-hover:text-on-surface">12</span>
+</button>
+<button class="flex items-center gap-xs group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">comment</span>
+<span class="text-label-caps text-on-surface-variant group-hover:text-on-surface">3</span>
+</button>
+</div>
+<button class="flex items-center gap-xs text-secondary group">
+<span class="material-symbols-outlined group-hover:fill transition-all">bookmark</span>
+</button>
+</div>
+</article>
+</div>
+</section>
+<!-- Right Column: Events & Discovery -->
+<aside class="w-full lg:w-1/3 flex flex-col gap-lg">
+<!-- Starting Soon Nearby -->
+<div class="bg-surface-container-low rounded-xl p-gutter space-y-md border border-outline-variant/10">
+<div class="flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-primary text-[20px]">Starting Soon</h3>
+<span class="material-symbols-outlined text-secondary">event</span>
+</div>
+<div class="space-y-base">
+<!-- Event Item 1 -->
+<div class="bg-surface p-base rounded-lg border border-outline-variant/30 flex items-start gap-sm hover:border-primary/40 cursor-pointer transition-all">
+<div class="flex flex-col items-center bg-primary-container text-on-primary-container px-3 py-1 rounded-md min-w-[50px]">
+<span class="text-[14px] font-bold">18</span>
+<span class="text-[10px] font-label-caps uppercase">Min</span>
+</div>
+<div class="flex flex-col overflow-hidden">
+<span class="font-bold text-body-md truncate">Sunday Sunrise Walk</span>
+<span class="text-on-surface-variant text-[11px] flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">location_on</span>
+                                        East Side Park
+                                    </span>
+<div class="mt-base flex items-center -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small avatar of a woman with blond hair." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBF6WIVG-OSGv-5q8VqqFFQxFdo_hHrp7VxcidDE3dalF2l42qSiQuttreG6EG8qvctuPxs2mDP2H1ZY8o_9as8zx9gNpbHLnphDqk_OnLb4Xh5boZ1AQJO-6dZIGNfGC9lur5U0xSZdOCKUWDr8TFUdek2SDgv3MEsk7_596ZdH-vmng6OHLBGcGr97o_sOE-aWpx4LzrkxibzAGnpudn0sFmvh8sOeAAdXugh73OvDtyQQvoSag2s9u-3qao5Jw-4NuCrfpeVBLG9">
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small avatar of a man with glasses." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdTqBP_WpeF7-mloXZUpjGdjX-IMRKdk2MuWRoqNaZmJiS1QBKhiOLN2PurIFptmOrcIVPNFC2NRrL-rEGjEtho83JYCZOO0cCN-RksTVrapros32TYNAJUmjvRXIN1Nl9JDPYw0Jhv37aCfZfqoS-iu3pBFJ03-laL-Dm1JqzMv8gzLSLdveNdlY4GAkkQnnHqj8njcfPum0-b0f6t7JyT-6HcuQmJyT61OqUST9jl2VGD0C-MW_gddEyZxSBSrE46CT76b1kP_gf">
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small avatar of a smiling young woman." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiddNnhSbNUAeiXlbW6ajHELlXh6jyIWTQzXt3N9uz2-53K4bfu45afsaAHlOqXoUZJ00k525pDANb2WuXtixMubefns06245Gn1j0HiwARvHMNdgaFI13Qaezyng1WUyxNilItwekT56xpMGsJ3nK5k_RGMMhjtAMBHneUqSyJiscpfwF-dvrCShYJUqrASkgGLGKkJ71vXKDXLBp4D3a7LXNuhs48afTwm6lQH7qxozoALT4z7dPGbiMc4-C2g2eIGw19XvJGhHn">
+</div>
+<span class="pl-4 text-[10px] text-on-surface-variant">+12 joining</span>
+</div>
+</div>
+</div>
+<!-- Event Item 2 -->
+<div class="bg-surface p-base rounded-lg border border-outline-variant/30 flex items-start gap-sm hover:border-primary/40 cursor-pointer transition-all">
+<div class="flex flex-col items-center bg-tertiary-container text-on-tertiary-container px-3 py-1 rounded-md min-w-[50px]">
+<span class="text-[14px] font-bold">45</span>
+<span class="text-[10px] font-label-caps uppercase">Min</span>
+</div>
+<div class="flex flex-col overflow-hidden">
+<span class="font-bold text-body-md truncate">Hill Training Session</span>
+<span class="text-on-surface-variant text-[11px] flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">location_on</span>
+                                        Peak Trail Entrance
+                                    </span>
+<div class="mt-base flex items-center -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small avatar of an athletic man." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe3rN4WDMcQppSr5sxJqSguH4-Dr1p0_rAe18Pbz-c99dGSFMZURB4pIuj5OpB27y4Mb7-17yR-_wJSUcQ5FeivyUlCzueYKqAVlqJzwhjt6SFUN2x43inaAPybsmRn32kqfJAMIiMLtMM_Izi3qv3r8EdZRlNTA2ZxXXBk-OH8q9825aALOoxIyZBfI-Zr1fB1ctFgb5JAprgWLQiZCEzaafIkyFALuQqfsielrMzwzP-cRNJrTmF6RWpGOLyFjfORyJsnczK7nxF">
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small avatar of a woman in cycling gear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwsI9DXVAk1qhaztG7OttAeM94zyQa2-nKB1RLUNbA33msUyCZGQ-otdSrdaUCg8M4YHOu0eGPmqaFS6-2wqUcj_V8YZAtd7T4j97T9-EyUe_V01uIiPe26h0ItwWOM4gNa6tW5Reqo_J9MjQqYVb18Bmv_3iELS596Nvt2HgVqdc3fxxcvzGLQOAH-i4De5_0EnoVv01xj6HOlrFhLKDQO57wnyuTevwjWqIFbyQgcEeS0DMmmSdtVklfa8jM3MP-ThvGXhhZntOM">
+</div>
+<span class="pl-4 text-[10px] text-on-surface-variant">+4 joining</span>
+</div>
+</div>
+</div>
+</div>
+<button class="w-full py-2 text-center text-primary font-label-caps text-[12px] border border-primary/20 rounded-lg hover:bg-primary-container/20 transition-all">
+                            View All Events
+                        </button>
+</div>
+<!-- Buddy Discovery -->
+<div class="bg-surface-container-low rounded-xl p-gutter space-y-md border border-outline-variant/10">
+<div class="flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-primary text-[20px]">Buddy Discovery</h3>
+<button class="text-on-surface-variant">
+<span class="material-symbols-outlined">refresh</span>
+</button>
+</div>
+<div class="space-y-md">
+<!-- Buddy 1 -->
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-sm">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A portrait of a young man with a focused expression, wearing technical sportswear. The background is a crisp city park with bright morning light. Modern, athletic aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3YrExITzH5R0_3SGUlnQkEWcHKdrJIy8LZtWbkUooABBzimwugFu7IMbibrjth-zLrja-Y6ckw6gSSBew5hp5-LVVe8Skz4S61YunBMeEfdM4t3fKcfVjf9X30eUGWnfeiLcVRRKbnWgFZ__myvlAUmQEi4J-1PGCtSMlXM1IjCg_3stGyf9CP0sTLIFGMjCp75C7E-gZI45ve2zGsKLCs8HiJw5bS4td_y_5MH6sKwiJac96H-RGIjyIDkBHXhNsHTpUhBPro0IT">
+</div>
+<div class="flex flex-col">
+<span class="font-bold text-body-md group-hover:text-primary transition-colors">Leo Zhang</span>
+<span class="text-on-surface-variant text-[11px] font-label-caps">Frequent Trail Runner</span>
+</div>
+</div>
+<button class="p-2 bg-primary-container text-on-primary-container rounded-full hover:brightness-95 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+</button>
+</div>
+<!-- Buddy 2 -->
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-sm">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A smiling woman with dark hair in a casual fitness top. Soft, ambient indoor lighting, clean aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYuj1RvKEhgKS6yDYcvuEp4vnnEHPYHHznvgUk9czrh2MaatD7nEKa0GmJ1Pk8i2cGQn31KPnPi6Ui3Lgk07WzNX7bSKAaON_1eGSiS8g0zAArzN8oWZMOyOL4RhzWpXq1IRjiYzNJOhqb0OzPoUg6YMmHZAzv_KTCwQrGB5kReOX29DSqEUdrL3jmzSpOH--gGWoHirtqRpcrOyIhzqn0zyKS7Pn8P-ZgPYxbGwQcWlX66Rg0rp_7IxH8kpYL5sw64-w-JGU7zgwk">
+</div>
+<div class="flex flex-col">
+<span class="font-bold text-body-md group-hover:text-primary transition-colors">Chloe Reed</span>
+<span class="text-on-surface-variant text-[11px] font-label-caps">Enjoys Nature Walks</span>
+</div>
+</div>
+<button class="p-2 bg-primary-container text-on-primary-container rounded-full hover:brightness-95 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+</button>
+</div>
+</div>
+</div><div class="bg-surface-container-low rounded-xl p-gutter space-y-md border border-outline-variant/10">
+    <div class="flex justify-between items-center">
+        <h3 class="font-headline-md text-headline-md text-primary text-[20px]">Local Activity Heatmap</h3>
+        <span class="material-symbols-outlined text-secondary">distance</span>
+    </div>
+    <div class="relative h-48 rounded-lg overflow-hidden bg-[#e0e4df] border border-outline-variant/30">
+    <!-- Base Map Layer -->
+    <div class="absolute inset-0 bg-cover bg-center opacity-80" style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuBumHjvm-C7siVUU3J21qKf3sG1pX0UbM7uqcPKU36ExfJWCyNNrYCZSQWLjHZDSOmYgyerZ26NZN2KGTyrNyUIXhJW_5SxsEub4r5vP7yQKdZJPiLIkpuKnPZGV4YfYdQJ4fdQ34BRmS30K0vHOICRzIrSQhNju-S45yDA1pW8UyGEW8qMpdvCXEjo59UVm2gPMxKU-tLwWl4LqCZTsBFau07i8pcSCad_uYjvKbasxyNYYU1zwhqefxLcN9GNQnMd6iKi24JIQgGg&quot;);"></div>
+    
+    <!-- Discovery Radius Overlay -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-primary/20 bg-primary/5 pointer-events-none"></div>
+    
+    <!-- Central Location Dot -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-secondary border-2 border-white rounded-full shadow-sm"></div>
+
+    <!-- Live User Pips -->
+    <div class="absolute top-[30%] left-[40%] flex flex-col items-center">
+        <div class="w-6 h-6 rounded-full border border-white shadow-sm overflow-hidden">
+            <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMLGrp-8wFGXj-K11wd3ff-LqeirIuF0xuWRIyU6c4C1NgR4u2fMCo3wWeA5Bbm-qKJap51s2EN0By6y_Tr3gFnO1HNNdhyE5ENzuxpLQ1uAXjIS-ymldqCY59avRVJD5mvrLNhPcON6oJ3yOTtR_eLHjo3OYel4cSJPfnc0fGox_OH--uR0h1mdwTPelR0DzadCBU5L94GWax7tVj3ru5Qx8FNO7wrvUOw7aXzpEsdY8psxmHqhHqY2UN0PPBta4cVqpCHt8Z9RBE">
+        </div>
+        <div class="absolute -top-1 -right-1 w-2 h-2 bg-secondary rounded-full border border-white animate-ping"></div>
+    </div>
+
+    <div class="absolute bottom-[35%] right-[35%] flex flex-col items-center">
+        <div class="w-6 h-6 rounded-full border border-white shadow-sm overflow-hidden">
+            <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqrM3wmsDuYBEot8n2aCPrk8GR4rH1YzBiaALbBMIIT2ulv-HLKyeq5VWF4HsNTE6qMCFaAtU4iorYSKBODogxk4gng_GLTmFQpNa_DHMQ9sX4pPM3QjuUs9v73Pduhtdjb4uekvN9MOroupEbY1Hawy1iCSKF8FZJDch-KvMaJ64mxlMsWawXTDbWfETZesvZinzakvQVlE3zGBBeKq2JV8qfRt8M0dEFasyAtVWM46SWcZJtHtOxWoXSK-6WCbsOJSDVxVP9cGia">
+        </div>
+        <div class="absolute -top-1 -right-1 w-2 h-2 bg-secondary rounded-full border border-white animate-ping"></div>
+    </div>
+</div>
+    <div class="flex justify-between items-center pt-xs">
+        <div class="flex flex-col">
+            <span class="text-[10px] font-label-caps text-on-surface-variant uppercase tracking-wider">Discovery Radius</span>
+            <span class="text-body-md font-bold text-primary">5km</span>
+        </div>
+        <div class="flex items-center gap-xs">
+            <span class="w-2 h-2 bg-error rounded-full animate-ping"></span>
+            <span class="text-[11px] font-label-caps text-on-surface-variant">Live Movement</span>
+        </div>
+    </div>
+</div>
+<!-- Ad/Banner Section -->
+<div class="relative h-32 rounded-xl overflow-hidden bg-primary-container flex items-center justify-center p-gutter">
+<div class="absolute inset-0 opacity-20">
+<img class="w-full h-full object-cover" data-alt="Abstract pattern of topographic map lines in deep forest green and light cream. The aesthetic is clean, organic, and modern, evoking a sense of adventure and nature." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5qYwGm7w8jLSLhapmaduDiyaAbVQOmmH7w8miz80_GnvLqDELmevMupfaFF5J1Vnew9lRgDceljq-o2uG3YebUaKJtaCQCnecpcWN9b7IgyY3OOlMQ7IRA--B3DQJfB7Yowf5ZxSBL1Jz58W0WESLC8Hj8L_IgVPQghDDhA7q7t9LAWOzaClXy5-UHvsBSitRXcpYJAvj5p5l3Nvm_ZDTrH7SO6jWWyZ06_y9Gvz0IjwQyxqpSWwzP2xhq2r74qHeY2RFOWsF09Mx">
+</div>
+<div class="relative z-10 text-center">
+<span class="text-[10px] font-label-caps uppercase text-on-primary-container/80 tracking-widest">Premium Trail Guide</span>
+<h4 class="font-bold text-on-primary-container text-body-lg">Unlock 500+ Hidden Trails</h4>
+<button class="mt-base px-4 py-1.5 bg-on-primary-container text-primary-container rounded-full font-label-caps text-[11px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-all">
+                                GO PREMIUM
+                            </button>
+</div>
+</div>
+</aside>
+</div>
+</main>
+</div>
+<!-- Floating Action Button for Mobile / Alternate Start -->
+<button class="fixed bottom-gutter right-gutter md:hidden bg-primary text-on-primary w-14 h-14 rounded-full flex items-center justify-center shadow-xl z-[60] active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-3xl fill">play_arrow</span>
+</button>
+<script>
+        // Micro-interactions and subtle effects
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                // Subtle feedback if needed
+            });
+        });
+
+        // Simple horizontal scroll wheel support for the "Live Nearby" row
+        const liveRow = document.querySelector('.overflow-x-auto');
+        if(liveRow) {
+            liveRow.addEventListener('wheel', (evt) => {
+                evt.preventDefault();
+                liveRow.scrollLeft += evt.deltaY;
+            });
+        }
+    </script>
+
+
+</body></html>

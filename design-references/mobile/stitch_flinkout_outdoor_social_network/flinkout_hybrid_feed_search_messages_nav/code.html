@@ -1,0 +1,434 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@100..900&amp;family=Space+Grotesk:wght@100..900&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "on-secondary-fixed-variant": "#1e477b",
+                    "on-error": "#ffffff",
+                    "secondary": "#395f94",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "surface-container-low": "#f3f4f3",
+                    "outline-variant": "#c1c8c4",
+                    "on-primary": "#ffffff",
+                    "on-primary-container": "#99bab0",
+                    "primary": "#16342d",
+                    "error": "#ba1a1a",
+                    "secondary-container": "#9ec2fe",
+                    "surface-container-highest": "#e1e3e2",
+                    "on-primary-fixed-variant": "#2e4c44",
+                    "inverse-primary": "#adcec3",
+                    "inverse-on-surface": "#f0f1f0",
+                    "tertiary-container": "#812600",
+                    "surface-container": "#edeeed",
+                    "secondary-fixed-dim": "#a7c8ff",
+                    "on-primary-fixed": "#01201a",
+                    "tertiary": "#5b1800",
+                    "primary-fixed-dim": "#adcec3",
+                    "surface-dim": "#d9dad9",
+                    "on-tertiary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#46645c",
+                    "surface-container-high": "#e7e8e7",
+                    "on-surface-variant": "#414846",
+                    "outline": "#717976",
+                    "on-tertiary-container": "#ff9976",
+                    "on-secondary-fixed": "#001c3b",
+                    "on-background": "#191c1c",
+                    "tertiary-fixed": "#ffdbd0",
+                    "surface-variant": "#e1e3e2",
+                    "on-surface": "#191c1c",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed": "#390c00",
+                    "primary-container": "#2d4b43",
+                    "on-tertiary-fixed-variant": "#832600",
+                    "surface-bright": "#f9f9f8",
+                    "surface": "#f9f9f8",
+                    "on-secondary-container": "#284f83",
+                    "background": "#f9f9f8",
+                    "primary-fixed": "#c8eadf",
+                    "secondary-fixed": "#d5e3ff",
+                    "inverse-surface": "#2e3131",
+                    "on-secondary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "sm": "12px",
+                    "md": "24px",
+                    "lg": "40px",
+                    "gutter": "16px",
+                    "base": "8px",
+                    "xl": "64px",
+                    "container-max": "1200px"
+            },
+            "fontFamily": {
+                    "data-mono": ["Space Grotesk"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "label-caps": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-header {
+            background: rgba(249, 249, 248, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- Top AppBar (Flinkout Themed) -->
+<header class="fixed top-0 w-full z-50 glass-header border-b border-outline-variant/30 shadow-sm h-16 flex items-center justify-between px-gutter" style="transform: translateY(0px); transition: transform 0.3s ease-out;">
+<div class="flex items-center gap-sm">
+<button class="p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-extrabold text-primary tracking-tight">Flinkout</h1>
+</div>
+<div class="flex items-center gap-sm">
+<button class="relative p-2 rounded-full hover:bg-surface-container-high/50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary">notifications</span>
+<span class="absolute top-2 right-2 w-2.5 h-2.5 bg-error border-2 border-surface rounded-full"></span>
+</button>
+<div class="w-10 h-10 rounded-full border-2 border-primary-container overflow-hidden active:scale-95 transition-transform cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A close-up professional profile portrait of a smiling young explorer wearing outdoor gear. The background is a soft-focus mountain landscape at sunrise, using warm, natural golden lighting. The aesthetic is clean, modern, and high-fidelity, matching a premium outdoor community app interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfB2OaNpqXtQ1KQEMFmPcnzaVN9AqExaxEwo84uZYGUhWbbRNVfrrezo_H-QUBPpa5CBDvdm4SoSWcove6QouUNsTk12K3aIJbKxJ_cXu83M1cB_kObQABxDQYq5cbvISZFULzNVkFcsfB15oHq8y3YsEKWp4h92EUorSXzfx1GXs6d4zH4APPG7GFJ5u3g_hzsotnwJNcrT4YA6g9RXSM3AEYZ7r-Rp2fL_YGscsSqNEYOWDsipbgOwbLs7h1_GTIT9riBpo5gbUT">
+</div>
+</div>
+</header>
+<main class="pt-20 pb-28 px-gutter flex flex-col gap-md"><section class="mb-sm -mx-gutter px-gutter">
+<h2 class="font-headline-md text-lg text-primary mb-sm">Live Nearby</h2>
+<div class="flex gap-md overflow-x-auto hide-scrollbar pb-sm">
+<!-- User Story 1 (Live) -->
+<div class="flex-shrink-0 flex flex-col items-center gap-xs cursor-pointer group">
+<div class="relative p-0.5 rounded-full bg-gradient-to-tr from-tertiary to-on-tertiary-container animate-pulse">
+<div class="w-16 h-16 rounded-full border-2 border-surface overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close-up profile photo of a cheerful hiker in a bright orange rain jacket" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_b60krooJ4no_ImMVEpapxOdZz8oBWEmJ9Onnh6aadOkLLfEIkX5ei6HYRmFspQB717bRKwGX25J7d-UT1qe0DP-nWtbao_PLEQx-BuIDID_L4cDEjPXPa2WmJDM9pIiQrYG8MI32I1xd1cW6HAw-bLd-Hzg2pALPZJfEQ5weS8aGTt2jMtKARk-Fwtfs2S40bCtRq1vqSe0_C3mpN0iX64zeiqLqrooiAKjqOm2YCUb19Sh3EHgLGv2YoMTc_0y-JlgNVHxUXl6I">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-tertiary text-on-tertiary font-label-caps text-[10px] px-1.5 py-0.5 rounded-full border border-surface">LIVE</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface group-hover:text-primary">Marcus</span>
+</div>
+<!-- User Story 2 (Live) -->
+<div class="flex-shrink-0 flex flex-col items-center gap-xs cursor-pointer group">
+<div class="relative p-0.5 rounded-full bg-gradient-to-tr from-tertiary to-on-tertiary-container">
+<div class="w-16 h-16 rounded-full border-2 border-surface overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Outdoor portrait of a professional woman runner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCct3-CLba0m050mluk-_MEeYwpTbRH1VPdRvBk-ZNvnloabMaDqVULZvrjcpCYNlSBdxHZQpO-hcwBdhmhPmrEfHFEzqrOeQ4V_1Fw3JucpPeD8TEUNRlhQtk6mYuhyRBeTGNtfcJlgAl7ogoAx-nxnG2B0ECWoDaq6gpNMqF80TdFBD7yKLV_fl9HdYuPxQcSMpA6Yy6fIRrME8MUIsdOraBlBRXMZCNDAcmI1mwjcy8qkzb1m88rKO-kw8V6ulrRpGvyqjvuq2-Z">
+</div>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-tertiary text-on-tertiary font-label-caps text-[10px] px-1.5 py-0.5 rounded-full border border-surface">LIVE</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface group-hover:text-primary">Elena</span>
+</div>
+<!-- User Story 3 -->
+<div class="flex-shrink-0 flex flex-col items-center gap-xs cursor-pointer group">
+<div class="w-16 h-16 rounded-full p-0.5 border-2 border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Portrait of a young man wearing a beanie" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMobDVz7_F-T6YU2bMdR4iyTmIPFnypg5zQXpKNuZatdVAjX3EQTfOycwG7k-ZQ28_n4U0qQt5sCm3okpJAP2uH53uI3gS1dkWrJCewhISemMNwECPIRXZ7Bbg4yHm3a_QowcBwyRTOvr5weTY-wl7uupt9-FknWUqCuUVHFRsU3zDoQzN_PRu7liR67ll76ylIpyegqgGbQg9xCxz8LOTVGq4LyFeXB9jCmFMPEQb6ksiS_jytc3UE6-1o0ROM6oVbenBihG9ogR4">
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary">Julian</span>
+</div>
+<!-- User Story 4 -->
+<div class="flex-shrink-0 flex flex-col items-center gap-xs cursor-pointer group">
+<div class="w-16 h-16 rounded-full p-0.5 border-2 border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Candid shot of a cyclist" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCWCUiXBK4Dn9xBAUsBa2L5GsYJ8Z3x14sq2P_zelXmWxxS1Wh6YY9x-FQRZ8_-rZnLtDFDpUHpXYyWmldczsg-IUwOjoWwWHjPjHhCyd5hwN6fv_Bvj-L0jqbTQT4lEnlZlWslsupB53Z34p-iGxhLeIN6TkPo5i9gKbiXtM-rlMeHMeamPnQZbc80ANU0Hg5cx23MKxdF-7C99hGhBmOavB0BZKB773mTQhT60Iz3VHNF3AC2JWfM7z8bIa3aRXY5vgT-JtCeRXR">
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary">Sasha</span>
+</div>
+</div>
+</section>
+<!-- Social Post 1: Elena Rodriguez -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-hidden">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Close up of a friendly explorer with a bright smile, wearing a green utility vest, soft natural lighting, blurred nature background, vibrant primary green tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDWvF5y_0BuWoadqvwCJs3Ic7SGv1Y84wLs4DH2rE9RFgEO8tMTF7CRUPalXTdMrn0wxiaOfRSSpZD9H4c7Afb95InxboorQjprHJMsi2_Jluo2-pxssFDAVdgbPBiYJl5nwV6X7jXDSfQOotWEy8qGdJ2ZPLSloqgrxTWTE_tP1scYEZiLQh1OpiwSvfYPanp8qRgVOx4inyVBAFRyclOF9x8_HYFEV8oXOxwbScd8XgI-8_AMhwWp6L9Aap__7xmwK0hr9zvPFVif">
+</div>
+<div>
+<h3 class="font-body-md font-bold text-on-surface">Elena Rodriguez</h3>
+<p class="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-widest">Morning Trail Loop • 2h ago</p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">more_horiz</span></button>
+</div>
+<div class="relative w-full aspect-video bg-surface-container-high overflow-hidden group">
+<div class="absolute inset-0 grayscale opacity-40 bg-[url('https://www.google.com/maps/vt/pb=!1m4!1m3!1i14!2i4823!3i6155!2m3!1e0!2sm!3i614131580!3m8!2sen!3sus!5e1105!12m4!1e68!2m2!1sset!2sRoadmap!4e0!5m1!1e0!23i4111425')] bg-cover"></div>
+<svg class="absolute inset-0 w-full h-full z-10 drop-shadow-lg" fill="none" viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+<path class="trail-glow" d="M50 150C80 120 120 180 160 140C200 100 250 160 300 110C330 90 350 40 370 70" stroke="#16342d" stroke-linecap="round" stroke-width="4"></path>
+<circle cx="50" cy="150" fill="#16342d" r="6" stroke="white" stroke-width="2"></circle>
+<circle cx="370" cy="70" fill="#adcec3" r="6" stroke="#16342d" stroke-width="2"></circle>
+</svg>
+<div class="absolute top-md left-md z-20">
+<span class="bg-surface/90 backdrop-blur-md px-sm py-1 rounded-full text-[11px] font-label-caps text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">hiking</span>
+#TRAILRUN
+</span>
+</div>
+</div>
+<div class="bg-primary px-md py-sm flex justify-between items-center text-on-primary">
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] opacity-70">DISTANCE</span>
+<span class="font-data-mono text-data-mono font-bold">8.42 KM</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="font-label-caps text-[10px] opacity-70">TIME</span>
+<span class="font-data-mono text-data-mono font-bold">42:15</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-[10px] opacity-70">PACE</span>
+<span class="font-data-mono text-data-mono font-bold">5.04/km</span>
+</div>
+</div>
+<div class="p-md">
+<p class="font-body-md text-on-surface mb-md">Finally hit the Ridge Trail! The views of the valley were incredible today. Definitely #StrollerFriendly for the first half.</p>
+<div class="flex items-center gap-md pt-sm border-t border-outline-variant/20">
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">favorite</span>
+<span class="font-label-caps text-label-caps">124</span>
+</button>
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">mode_comment</span>
+<span class="font-label-caps text-label-caps">18</span>
+</button>
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors ml-auto">
+<span class="material-symbols-outlined">share</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Discovery Card: Starting Soon Nearby -->
+<section class="flex flex-col gap-sm">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-lg text-primary">Starting Soon Nearby</h2>
+<button class="text-primary text-xs font-bold uppercase tracking-widest">View All</button>
+</div>
+<div class="flex overflow-x-auto gap-md hide-scrollbar pb-2 -mx-gutter px-gutter">
+<!-- Discovery Item 1 -->
+<div class="min-w-[280px] bg-surface rounded-xl border border-outline-variant/30 shadow-md overflow-hidden flex flex-col group">
+<div class="h-32 w-full relative">
+<img class="w-full h-full object-cover" data-alt="A serene landscape of Misty Valley, featuring soft fog rolling over green hills at dawn. The scene is shot with a cinematic wide lens, emphasizing the peaceful and welcoming outdoor atmosphere. Colors are muted greens and soft grays, creating a calming, high-end travel photography look." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6Oj0UcKAu7qxDvPzHXywA6nFkcsAlXTsuzAd1a7H4F6kWsS3Gr5fLJrWWAsafnDYgaaPUrx8lvXl4LhaBNusNM4TXsKeHPL1R8tUHT4hzfKU8L29XCWEM8sXP3cnwtXp7lBKVn_TQiuCp3Pkl4G_6usqdvkOPK9vo0udFNrCKgQ8m4tEojAebux5DvsMeO0sFvaAZ8UMAjrWUYlNDnslebJnfFxyI-aCatulTIn8XAVvzbHiBTqnaetKblIk6Gg-P7f-mjGtlEmdi">
+<div class="absolute top-2 left-2 bg-secondary-container/90 px-2 py-1 rounded-full flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px] text-on-secondary-container">schedule</span>
+<span class="text-[10px] font-bold text-on-secondary-container">Starts in 15m</span>
+</div>
+</div>
+<div class="p-md flex flex-col gap-xs">
+<h3 class="font-headline-md text-sm text-on-surface">Misty Valley Loop</h3>
+<p class="text-xs text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">location_on</span> 2.4 km away
+                        </p>
+<div class="mt-sm flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border border-surface bg-slate-300"></div>
+<div class="w-6 h-6 rounded-full border border-surface bg-slate-400"></div>
+<div class="w-6 h-6 rounded-full border border-surface bg-slate-500 flex items-center justify-center text-[8px] font-bold text-white">+8</div>
+</div>
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-primary-container active:scale-95 transition-all">Join Now</button>
+</div>
+</div>
+</div>
+<!-- Discovery Item 2 -->
+<div class="min-w-[280px] bg-surface rounded-xl border border-outline-variant/30 shadow-md overflow-hidden flex flex-col group">
+<div class="h-32 w-full relative">
+<img class="w-full h-full object-cover" data-alt="A sun-dappled urban park path with joggers and cyclists. Modern city architecture is visible in the background under a clear blue sky. The lighting is bright and energetic, with sharp shadows and vibrant colors. The overall aesthetic is active, social, and community-focused." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCu5h8vFCfKhSJhnrJVIn6ofIqoqMV358CpS1CpKu2ZzzWIOUQNxk9n77GSbh4CanLiIj7TZ0coalGlecMqZ6kgXby4ejBzJjVKXELbmTUHqVz_U63OINiHElvEoCM8wuIrRVCb5qIi6CTLtGCqGFMp3EecNOIyWEvaYThuHjqRMEFphYANJTCjpotnBgfrm3aRQYKMI9cx4jOVSASa1SLH1RdzNU4UweQFgukuZUbgJ5QstYIuzMM8-TO8WjpLWIyrzEDHQfuxEME_">
+<div class="absolute top-2 left-2 bg-secondary-container/90 px-2 py-1 rounded-full flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px] text-on-secondary-container">schedule</span>
+<span class="text-[10px] font-bold text-on-secondary-container">Starts in 40m</span>
+</div>
+</div>
+<div class="p-md flex flex-col gap-xs">
+<h3 class="font-headline-md text-sm text-on-surface">Riverfront Dash</h3>
+<p class="text-xs text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">location_on</span> 0.8 km away
+                        </p>
+<div class="mt-sm flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border border-surface bg-slate-200"></div>
+<div class="w-6 h-6 rounded-full border border-surface bg-slate-300"></div>
+<div class="w-6 h-6 rounded-full border border-surface bg-slate-400 flex items-center justify-center text-[8px] font-bold text-white">+3</div>
+</div>
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-primary-container active:scale-95 transition-all">Join Now</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Social Post 2: Julian Chen -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-hidden">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Portrait of a young urban explorer in a techwear jacket, golden hour city lighting, modern skyscrapers blurred in background, high contrast and professional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATuYvaFsKq7VTz92uZliiE54pXxAwVSEijiOJwVuz1WIwivKFJfLo4E_OCjMnZ8_F7bUx5Xn-smfoN--cICoYSks75R5Ja_Ouqx0xPcREvWVeQPCtvBk5ywtdCYSPnFlX-DfkvrwrA0XGe7bkeakM7PMrSfEfR3pACHuCM1D9nkUDtHuuD6LHZvatSrA5gHIiuedHUwbdjLk93G3QA1QuYHWlvxfFhsfGgtnBZmKwFSOdGbpmxvFkBaK2KrLKLSg83pmw91KLUVyTz">
+</div>
+<div>
+<h3 class="font-body-md font-bold text-on-surface">Julian Chen</h3>
+<p class="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-widest">Urban Expedition • 5h ago</p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">more_horiz</span></button>
+</div>
+<div class="relative w-full aspect-video bg-surface-container-high overflow-hidden group">
+<div class="absolute inset-0 grayscale opacity-40 bg-[url('https://www.google.com/maps/vt/pb=!1m4!1m3!1i14!2i4823!3i6155!2m3!1e0!2sm!3i614131580!3m8!2sen!3sus!5e1105!12m4!1e68!2m2!1sset!2sRoadmap!4e0!5m1!1e0!23i4111425')] bg-cover"></div>
+<svg class="absolute inset-0 w-full h-full z-10 drop-shadow-lg" fill="none" viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+<path class="trail-glow" d="M350 50 L350 120 L250 120 L250 180 L100 180" stroke="#16342d" stroke-linecap="round" stroke-width="4"></path>
+<circle cx="350" cy="50" fill="#16342d" r="6" stroke="white" stroke-width="2"></circle>
+<circle cx="100" cy="180" fill="#adcec3" r="6" stroke="#16342d" stroke-width="2"></circle>
+</svg>
+<div class="absolute top-md left-md z-20">
+<span class="bg-surface/90 backdrop-blur-md px-sm py-1 rounded-full text-[11px] font-label-caps text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">explore</span>
+#EXPLORATION
+</span>
+</div>
+</div>
+<div class="bg-primary px-md py-sm flex justify-between items-center text-on-primary">
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] opacity-70">DISTANCE</span>
+<span class="font-data-mono text-data-mono font-bold">4.10 KM</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="font-label-caps text-[10px] opacity-70">TIME</span>
+<span class="font-data-mono text-data-mono font-bold">58:02</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-[10px] opacity-70">PACE</span>
+<span class="font-data-mono text-data-mono font-bold">5.8/km</span>
+</div>
+</div>
+<div class="p-md">
+<p class="font-body-md text-on-surface mb-md">Exploring the industrial district today. Lots of cool graffiti and hidden pocket parks. #DogFriendly but watch for glass.</p>
+<div class="flex items-center gap-md pt-sm border-t border-outline-variant/20">
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">favorite</span>
+<span class="font-label-caps text-label-caps">86</span>
+</button>
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">mode_comment</span>
+<span class="font-label-caps text-label-caps">4</span>
+</button>
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors ml-auto">
+<span class="material-symbols-outlined">share</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Buddy Spotlight -->
+<section class="bg-primary-container/10 border border-primary-container/20 rounded-xl p-md flex flex-col gap-sm">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-lg text-primary flex items-center gap-2">
+                    Buddy Spotlight
+                    <span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-error animate-pulse"></span>
+</h2>
+<span class="text-[10px] font-label-caps text-on-primary-fixed-variant uppercase">Nearby Now</span>
+</div>
+<div class="grid grid-cols-2 gap-sm">
+<!-- Buddy 1 -->
+<div class="bg-surface rounded-lg p-sm border border-outline-variant/30 flex items-center gap-sm relative">
+<div class="w-12 h-12 rounded-full bg-slate-300 relative">
+<img class="w-full h-full rounded-full object-cover" data-alt="A headshot of Marcus, a cheerful African American man in fitness apparel. He is shown from the shoulders up with a park background. The lighting is bright and natural, suggesting a healthy, active lifestyle. High resolution, professional photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgKMJkKNLZLicJHKOZ96O2f9hzGlRv0GActmH8IQSFygtU_GbMOCQjU7XiwAOx9XRz1MhpWcRWkcbIo71AwEaXmiMFc1mOzDgyuk5pP0_-jbHj8Xe9MIKOm1XikVt4vzz08BpH5FoC4IFzUIA8P13wrzN9gmVjhEv-ggQUNtH8yoRD5x8Ebwd_SfGzw6CAGcB5ZLUcPy3cTf_8SwRRGguJNKwIPVY79bB9Zzcc2yLaR4YXlEsNwcmNUTu9lIBdMR_RvPIqQ0_HCEod">
+<div class="absolute -bottom-1 -right-1 bg-error text-on-error text-[8px] font-bold px-1.5 py-0.5 rounded-full border-2 border-surface">LIVE</div>
+</div>
+<div>
+<p class="font-bold text-sm text-on-surface">Marcus</p>
+<p class="text-[10px] text-on-surface-variant">0.4 km away</p>
+</div>
+</div>
+<!-- Buddy 2 -->
+<div class="bg-surface rounded-lg p-sm border border-outline-variant/30 flex items-center gap-sm relative">
+<div class="w-12 h-12 rounded-full bg-slate-300 relative">
+<img class="w-full h-full rounded-full object-cover" data-alt="A secondary portrait of Elena Rodriguez in her running gear, smiling. This shot focuses on her active energy, with a blurred natural background. High-quality outdoor lifestyle photography for a community-first app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSsLWPG-A0USF1vwme0OgDzL-55vVXoHMlqxbdDVVvaZMdy6tv7_jt4U8030MHywZis9utk4Nc9xkKTMNB3biVuskZ6f5VIDj0KfurPN6Jc8abV_68t5pxJI2NyjVOGJx7Nk2X4GTGm9uyI48_rd433phGn6fTBWmUndXk7P-DIm0r2_Lkm5VNUuBiLC91sgU28mIHjRswBzfIanojZ0qQb38MM1FDfE3RJkuAH1PeKJmuYcbFycpg_ILlfMJ4hicvNPw-H4uS8bqi">
+<div class="absolute -bottom-1 -right-1 bg-error text-on-error text-[8px] font-bold px-1.5 py-0.5 rounded-full border-2 border-surface">LIVE</div>
+</div>
+<div>
+<p class="font-bold text-sm text-on-surface">Elena</p>
+<p class="text-[10px] text-on-surface-variant">1.2 km away</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<button class="fixed bottom-[88px] right-4 z-50 bg-primary text-on-primary flex items-center gap-2 px-6 py-3 rounded-full shadow-lg active:scale-95 transition-transform" style="bottom: 104px;">
+  <span class="material-symbols-outlined">directions_walk</span>
+  <span class="font-label-caps text-sm tracking-widest uppercase">Start</span>
+</button><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-lg shadow-[0_-4px_12px_rgba(0,0,0,0.05)] flex justify-around items-center h-20 px-4">
+<a class="flex flex-col items-center justify-center text-primary bg-primary-container/30 rounded-xl px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">home</span>
+<span class="font-label-caps text-[10px]">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">search</span><span class="font-label-caps text-[10px]">Search</span></a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-caps text-[10px]">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary px-4 py-1 active:scale-90 transition-transform" href="#"><span class="material-symbols-outlined">mail</span><span class="font-label-caps text-[10px]">Messages</span></a>
+</nav>
+<script>
+        // Simple Micro-interactions
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('touchstart', () => {
+                el.style.transform = 'scale(0.96)';
+            });
+            el.addEventListener('touchend', () => {
+                el.style.transform = '';
+            });
+        });
+
+        // Sticky Header scroll effect
+        let lastScroll = 0;
+        window.addEventListener('scroll', () => {
+            const currentScroll = window.pageYOffset;
+            const header = document.querySelector('header');
+            if (currentScroll > lastScroll && currentScroll > 80) {
+                header.style.transform = 'translateY(-100%)';
+            } else {
+                header.style.transform = 'translateY(0)';
+            }
+            header.style.transition = 'transform 0.3s ease-out';
+            lastScroll = currentScroll;
+        });
+    </script>
+
+
+
+
+
+
+
+
+
+
+</body></html>

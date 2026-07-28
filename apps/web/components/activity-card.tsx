@@ -3,40 +3,51 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { api, type SocialActivity } from '../lib/api';
-import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
+import { averageSpeedKmh, formatDistance, formatDuration, formatPace } from '../lib/activity';
+import { useInteractions } from './interaction-provider';
+import { UiIcon } from './ui-icon';
 
-function RoutePreview({ points }: { points: SocialActivity['route'] }) {
+function RoutePreview({ points, activityType }: { points: SocialActivity['route']; activityType: SocialActivity['type'] }) {
   if (!points?.length) return <div className="route-preview empty">Route unavailable</div>;
   const lat = points.map(point => point.latitude);
   const lon = points.map(point => point.longitude);
   const minLat = Math.min(...lat), maxLat = Math.max(...lat);
   const minLon = Math.min(...lon), maxLon = Math.max(...lon);
-  const coords = points.map(point =>
-    `${12 + ((point.longitude - minLon) / (maxLon - minLon || 1)) * 176},${88 - ((point.latitude - minLat) / (maxLat - minLat || 1)) * 76}`,
-  ).join(' ');
-  return <div className="route-preview"><svg viewBox="0 0 200 100" aria-label="Activity route preview" role="img"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="route-start" /><span className="route-finish" /></div>;
+  const coords = points.map(point => `${15 + ((point.longitude - minLon) / (maxLon - minLon || 1)) * 170},${86 - ((point.latitude - minLat) / (maxLat - minLat || 1)) * 72}`).join(' ');
+  return <div className={`route-preview trail-route ${activityType.toLowerCase()}`}>
+    <span className="terrain-shape terrain-one" /><span className="terrain-shape terrain-two" /><span className="terrain-water" />
+    <svg viewBox="0 0 200 100" aria-label="Activity route preview" role="img"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    <span className="route-camera start">□</span><span className="route-camera finish">□</span>
+  </div>;
 }
 
 function Avatar({ activity }: { activity: SocialActivity }) {
   const profile = activity.user.profile;
-  return profile?.photoUrl
-    ? <img className="avatar small" src={profile.photoUrl} alt="" />
-    : <span className="avatar small" aria-hidden>{(profile?.displayName ?? activity.user.username)[0].toUpperCase()}</span>;
+  return profile?.photoUrl ? <img className="avatar small" src={profile.photoUrl} alt="" /> : <span className={`avatar small activity-avatar ${activity.type.toLowerCase()}`} aria-hidden>{(profile?.displayName ?? activity.user.username)[0].toUpperCase()}</span>;
+}
+
+function contentFor(activity: SocialActivity) {
+  if (activity.type === 'RIDE') return { location: 'Downtown Greenway', description: "Light ride before work. The waterfront is always therapeutic. Who's out this weekend?", tags: ['CityRide', 'MorningMiles'] };
+  if (activity.type === 'HIKE') return { location: 'Peak Trail Entrance', description: 'A slow climb, wide views, and exactly the kind of quiet morning I needed.', tags: ['TrailDay', 'WeekendHike'] };
+  if (activity.type === 'WALK') return { location: 'East Side Park', description: 'A relaxed neighborhood loop with good company and even better weather.', tags: ['DailyWalk', 'TogetherOutside'] };
+  return { location: 'Silver Creek Loop', description: 'Crisp morning air and perfectly quiet trails today. Finally beat my best time on the ascent!', tags: ['MorningRun', 'TrailRun', 'SoloSession'] };
 }
 
 export function ActivityCard({ initial }: { initial: SocialActivity }) {
   const [activity, setActivity] = useState(initial);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const { notify, share } = useInteractions();
   const paceType = activity.type !== 'RIDE';
-  const metric = paceType
-    ? formatPace(activity.distanceM, activity.durationS)
-    : `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h`;
+  const metric = paceType ? formatPace(activity.distanceM, activity.durationS) : `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h`;
+  const content = contentFor(activity);
 
   async function toggleReaction() {
     const previous = activity;
     const next = { ...activity, reactedByViewer: !activity.reactedByViewer, reactionCount: activity.reactionCount + (activity.reactedByViewer ? -1 : 1) };
-    setActivity(next);
-    setError('');
+    setActivity(next); setError('');
     if (activity.id.startsWith('demo-')) return;
     try {
       const result = await api<{ reacted: boolean; reactionCount: number }>(`/activities/${activity.id}/reactions`, { method: activity.reactedByViewer ? 'DELETE' : 'POST' });
@@ -47,31 +58,34 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
     }
   }
 
+  if (hidden) return <section className="activity-hidden card"><p>Activity hidden from your feed.</p><button onClick={() => setHidden(false)}>Undo</button></section>;
+
   return <article className="activity-card card">
     <header className="activity-head">
       <Link href={`/u/${activity.user.username}`} className="row profile-link">
         <Avatar activity={activity} />
-        <span>
-          <strong>{activity.user.profile?.displayName ?? activity.user.username}</strong>
-          <small>@{activity.user.username} · {new Date(activity.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small>
-        </span>
+        <span><strong>{activity.user.profile?.displayName ?? activity.user.username} <small>• {new Date(activity.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}</small></strong><em><UiIcon name="map" size={14} />{content.location}</em></span>
       </Link>
-      <button className="more-button" aria-label="More activity options">•••</button>
+      <button className="more-button" aria-label={`More options for ${activity.user.profile?.displayName ?? activity.user.username}`} aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><UiIcon name="more" /></button>
+      {menuOpen && <div className="activity-option-menu">
+        <Link href={`/activities/${activity.id}`}>View activity</Link>
+        <button onClick={() => { setSaved(true); setMenuOpen(false); notify('Activity saved for later.'); }}>Save activity</button>
+        <button onClick={() => { setHidden(true); setMenuOpen(false); }}>Hide from feed</button>
+      </div>}
     </header>
-    <div className="activity-copy">
-      <h2>{activity.type === 'RIDE' ? 'Morning city ride' : activity.type === 'HIKE' ? 'Trail day' : activity.type === 'WALK' ? 'Daily walk' : 'Morning run'}</h2>
-      <span className="activity-type">{labelFor(activity.type)}</span>
+    <div className="route-shell">
+      <Link href={`/activities/${activity.id}`} aria-label="Open activity details"><RoutePreview points={activity.route} activityType={activity.type} /></Link>
+      <div className="activity-metrics">
+        <span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span>
+        <span><small>Time</small><strong>{formatDuration(activity.durationS)}</strong></span>
+        <span><small>{paceType ? 'Pace' : 'Speed'}</small><strong>{metric}</strong></span>
+      </div>
+      <Link className="route-play" href={`/activities/${activity.id}`} aria-label="Replay activity"><UiIcon name="play" size={26} /></Link>
     </div>
-    <Link href={`/activities/${activity.id}`} aria-label="Open activity details"><RoutePreview points={activity.route} /></Link>
-    <div className="activity-metrics">
-      <span><strong>{formatDistance(activity.distanceM)}</strong>Distance</span>
-      <span><strong>{formatDuration(activity.durationS)}</strong>Duration</span>
-      <span><strong>{metric}</strong>{paceType ? 'Avg. pace' : 'Avg. speed'}</span>
-    </div>
+    <div className="activity-story"><p>{content.description}</p><div>{content.tags.map(tag => <span key={tag}>#{tag}</span>)}</div></div>
     <footer className="activity-actions">
-      <button className={activity.reactedByViewer ? 'reacted' : ''} onClick={toggleReaction} aria-pressed={activity.reactedByViewer}><span aria-hidden>{activity.reactedByViewer ? '♥' : '♡'}</span> {activity.reactionCount}</button>
-      <Link href={`/activities/${activity.id}#comments`}><span aria-hidden>○</span> {activity.commentCount} comments</Link>
-      <button aria-label="Share activity"><span aria-hidden>↗</span> Share</button>
+      <div><button className={activity.reactedByViewer ? 'reacted' : ''} onClick={toggleReaction} aria-pressed={activity.reactedByViewer}><UiIcon name="heart" /> {activity.reactionCount}</button><Link href={`/activities/${activity.id}#comments`}><UiIcon name="chat" /> {activity.commentCount}</Link><button aria-label="Share activity" onClick={() => void share({ title: `${content.location} on Flinkout`, text: content.description, url: `${window.location.origin}/activities/${activity.id}` })}><UiIcon name="share" /></button></div>
+      <button className={saved ? 'saved' : ''} onClick={() => { setSaved(current => { notify(current ? 'Removed from saved activities.' : 'Activity saved for later.'); return !current; }); }} aria-label={saved ? 'Remove bookmark' : 'Bookmark activity'} aria-pressed={saved}><UiIcon name="bookmark" /></button>
     </footer>
     {error && <p className="error card-error" role="alert">{error}</p>}
   </article>;

@@ -1,0 +1,321 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport">
+<title>Session Details | PathFinder</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed-variant": "#2e4c44",
+                    "on-secondary-fixed-variant": "#1e477b",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c1c8c4",
+                    "on-secondary-container": "#284f83",
+                    "surface": "#f9f9f8",
+                    "surface-bright": "#f9f9f8",
+                    "secondary-fixed-dim": "#a7c8ff",
+                    "primary": "#16342d",
+                    "inverse-on-surface": "#f0f1f0",
+                    "on-primary-fixed": "#01201a",
+                    "inverse-surface": "#2e3131",
+                    "surface-tint": "#46645c",
+                    "surface-dim": "#d9dad9",
+                    "inverse-primary": "#adcec3",
+                    "error-container": "#ffdad6",
+                    "error": "#ba1a1a",
+                    "background": "#f9f9f8",
+                    "on-surface-variant": "#414846",
+                    "surface-container-highest": "#e1e3e2",
+                    "on-tertiary-fixed": "#390c00",
+                    "surface-variant": "#e1e3e2",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-fixed": "#d5e3ff",
+                    "surface-container-low": "#f3f4f3",
+                    "on-tertiary-fixed-variant": "#832600",
+                    "tertiary": "#5b1800",
+                    "on-surface": "#191c1c",
+                    "on-error-container": "#93000a",
+                    "secondary-container": "#9ec2fe",
+                    "surface-container-high": "#e7e8e7",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "tertiary-container": "#812600",
+                    "primary-container": "#2d4b43",
+                    "on-tertiary-container": "#ff9976",
+                    "tertiary-fixed": "#ffdbd0",
+                    "primary-fixed": "#c8eadf",
+                    "surface-container": "#edeeed",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#99bab0",
+                    "on-primary": "#ffffff",
+                    "on-secondary-fixed": "#001c3b",
+                    "outline": "#717976",
+                    "on-background": "#191c1c",
+                    "on-secondary": "#ffffff",
+                    "secondary": "#395f94",
+                    "primary-fixed-dim": "#adcec3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "base": "8px",
+                    "container-max": "1200px",
+                    "xs": "4px",
+                    "xl": "64px",
+                    "lg": "40px",
+                    "gutter": "16px",
+                    "sm": "12px",
+                    "md": "24px"
+            },
+            "fontFamily": {
+                    "data-mono": ["Space Grotesk"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "label-caps": ["Space Grotesk"],
+                    "headline-lg": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes highfive-bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .animate-highfive { animation: highfive-bounce 0.3s ease-out; }
+
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: repeating-linear-gradient(to bottom, transparent, transparent 4px, #c1c8c4 4px, #c1c8c4 8px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md overflow-x-hidden">
+<!-- Top AppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md">
+<div class="flex justify-between items-center w-full px-4 h-16">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:opacity-80">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary font-extrabold tracking-tight">Activity</h1>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:opacity-80">
+<span class="material-symbols-outlined text-primary">share</span>
+</button>
+</div>
+</header>
+<main class="pt-16 pb-24">
+<!-- Map Canvas Section -->
+<section class="relative h-[397px] w-full overflow-hidden">
+<div class="w-full h-full bg-cover bg-center" data-alt="A detailed digital map rendering showing a winding walking path through a lush coastal city park in Vancouver. The map features soft topographic lines, minimalist street markers, and an organic lime-green line indicating a completed route. The lighting is bright and airy, reflecting a modern light-mode interface with subtle depth and soft ambient shadows." data-location="Vancouver, Canada" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBGqUDTpH8wpUA21rUzhK0uLxJaK43lhQ0pi4ZIrQefgZTnBQnaaihy78M2NGVY8iwrlfHgsFUMf643KG7kX4M16hxF_zmk32nyBUQ-Oybbf49si-8bTK2tY6jjE9OvE4iro3kgjiMATWEkd8tZGDHg5lYvnW88YcQ3NXG7AeWEk1j7CaEFba6Llnenp5XHwcQ08BDQY48hijVzYUCl9sZflNQ1E_PZ6JQFEoCKK1q1ULf46wOY30T4jrt25Hrl2jgHJwRHfAagf5xu')"></div>
+<!-- Overlay Stats Card -->
+<div class="absolute bottom-4 left-4 right-4 flex gap-2">
+<div class="flex-1 bg-surface/90 backdrop-blur-md rounded-xl p-3 shadow-lg flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">route</span>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase">Distance</p>
+<p class="font-data-mono text-data-mono text-primary">4.2 km</p>
+</div>
+</div>
+<div class="flex-1 bg-surface/90 backdrop-blur-md rounded-xl p-3 shadow-lg flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">timer</span>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase">Duration</p>
+<p class="font-data-mono text-data-mono text-secondary">52 min</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Content Area -->
+<div class="px-gutter mt-md">
+<!-- User Header -->
+<div class="flex items-center justify-between mb-md">
+<div class="flex items-center gap-3">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="A portrait of a smiling young woman with a warm, friendly expression, wearing outdoor athletic gear. The lighting is soft and natural, suggesting a late afternoon golden hour in a suburban neighborhood setting. The style is professional and inviting, fitting a community-focused fitness app with soft focus background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXIQsCwcXid7GXbYP0ohRjti4N2fN6RaN0QPSNSany8NiSAAiQeoc-gWjNLnAmtogPUx9e6TKkry59zpUBcBY4-NYGTdV8FBGbvOaOqE5WbtolYjgiJNcNCjgbKxJC-wSO-aTbPdJSZgeM3UMtT0ejyNz1uXvvuinus9Ie23iIxkT5-vfI0HST7b4mSygncUiU3KTnoTr0OH8xN4TVxvZtJ5gU7PrwL29flXQ5dTM4FU1led54I3FeQYM5HHLF2Tjfi_-aDLKek-uK">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary leading-tight">Morning Harbor Loop</h2>
+<p class="font-body-md text-on-surface-variant">by Elena Rodriguez</p>
+</div>
+</div>
+<div class="bg-surface-container text-on-surface-variant px-3 py-1 rounded-full font-label-caps text-label-caps">
+                    #SunnyWalk
+                </div>
+</div>
+<!-- Prominent High-Five Button -->
+<div class="mb-lg">
+<button class="w-full bg-tertiary text-on-tertiary font-headline-md py-4 rounded-xl shadow-md flex items-center justify-center gap-3 active:scale-95 transition-all duration-200" id="highFiveBtn">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">front_hand</span>
+                    Send High-Five
+                    <span class="font-data-mono bg-on-tertiary/20 px-2 py-1 rounded-lg text-sm" id="highFiveCount">24</span>
+</button>
+</div>
+<!-- Session Timeline -->
+<div class="mb-lg">
+<h3 class="font-headline-md text-primary mb-4">Session Activity</h3>
+<div class="relative timeline-line ml-1">
+<!-- Activity Item: Started -->
+<div class="relative pl-12 pb-8">
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-primary">play_arrow</span>
+</div>
+<div>
+<p class="font-body-lg font-bold text-on-surface">Session Started</p>
+<p class="text-on-surface-variant font-data-mono text-xs">08:15 AM • Stanley Park Entrance</p>
+</div>
+</div>
+<!-- Activity Item: High-Five Received -->
+<div class="relative pl-12 pb-8">
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">front_hand</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl shadow-sm border border-outline-variant/30">
+<p class="font-body-md text-on-surface"><span class="font-bold">Marcus Chen</span> sent a high-five!</p>
+<p class="text-on-surface-variant font-data-mono text-xs mt-1">08:42 AM</p>
+</div>
+</div>
+<!-- Activity Item: Joined -->
+<div class="relative pl-12 pb-8">
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-secondary">group_add</span>
+</div>
+<div>
+<p class="font-body-lg font-bold text-on-surface">Sarah &amp; Toby joined the walk</p>
+<p class="text-on-surface-variant font-data-mono text-xs">08:55 AM • Seawall Crossing</p>
+</div>
+</div>
+<!-- Activity Item: Completed -->
+<div class="relative pl-12">
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-white">check_circle</span>
+</div>
+<div>
+<p class="font-body-lg font-bold text-primary">Session Completed</p>
+<p class="text-on-surface-variant font-data-mono text-xs">09:07 AM • Harbor Marina</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Community Notes Section -->
+<section class="mb-md">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-primary">Community Notes</h3>
+<span class="font-label-caps text-label-caps bg-surface-container-high px-2 py-1 rounded">3 Notes</span>
+</div>
+<div class="space-y-4">
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/20">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-secondary text-sm">location_on</span>
+<p class="font-label-caps text-label-caps text-secondary uppercase">Trail Condition</p>
+</div>
+<p class="font-body-md text-on-surface">"The path near the fountain is a bit slippery today due to the recent rain. Watch your step!"</p>
+<div class="flex items-center justify-between mt-3">
+<span class="text-xs font-data-mono text-on-surface-variant">2h ago by Sarah G.</span>
+<button class="flex items-center gap-1 text-primary active:opacity-60">
+<span class="material-symbols-outlined text-lg">thumb_up</span>
+<span class="text-xs">Helpful</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/20">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-tertiary text-sm">star</span>
+<p class="font-label-caps text-label-caps text-tertiary uppercase">Hidden Gem</p>
+</div>
+<p class="font-body-md text-on-surface">"Great spot for a photo right by the harbor master's office. The flowers are in full bloom!"</p>
+<div class="flex items-center justify-between mt-3">
+<span class="text-xs font-data-mono text-on-surface-variant">5h ago by David K.</span>
+<button class="flex items-center gap-1 text-primary active:opacity-60">
+<span class="material-symbols-outlined text-lg">thumb_up</span>
+<span class="text-xs">Helpful</span>
+</button>
+</div>
+</div>
+</div>
+<button class="w-full mt-4 py-3 border-2 border-dashed border-outline-variant rounded-xl text-on-surface-variant font-label-caps text-label-caps flex items-center justify-center gap-2 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">add</span>
+                    ADD A NOTE
+                </button>
+</section>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Mandatory) -->
+<nav class="fixed bottom-0 w-full z-50 backdrop-blur-md shadow-[0_-4px_12px_0px_rgba(0,0,0,0.05)] flex justify-around items-center px-4 py-2 pb-safe bg-surface/90 rounded-t-xl"><a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-200" href="#"><span class="material-symbols-outlined">home</span><span class="font-label-caps text-label-caps">Home</span></a><a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1.5 active:scale-95 transition-all duration-200" href="#"><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">explore</span><span class="font-label-caps text-label-caps">Discover</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-200" href="#"><span class="material-symbols-outlined">map</span><span class="font-label-caps text-label-caps">Map</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-200" href="#"><span class="material-symbols-outlined">person</span><span class="font-label-caps text-label-caps">Profile</span></a></nav>
+<script>
+        document.getElementById('highFiveBtn').addEventListener('click', function() {
+            const countEl = document.getElementById('highFiveCount');
+            const currentCount = parseInt(countEl.innerText);
+            countEl.innerText = currentCount + 1;
+            
+            this.classList.add('animate-highfive');
+            this.classList.remove('bg-tertiary');
+            this.classList.add('bg-primary');
+            this.innerHTML = `
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                High-Five Sent!
+                <span class="font-data-mono bg-on-primary/20 px-2 py-1 rounded-lg text-sm">${currentCount + 1}</span>
+            `;
+
+            setTimeout(() => {
+                this.classList.remove('animate-highfive');
+            }, 300);
+        });
+
+        // Simple parallax for map on scroll
+        window.addEventListener('scroll', () => {
+            const scroll = window.pageYOffset;
+            const map = document.querySelector('[data-location]');
+            if(map) {
+                map.style.transform = `translateY(${scroll * 0.4}px)`;
+            }
+        });
+    </script>
+
+
+
+
+</body></html>
