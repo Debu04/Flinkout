@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { api, type SocialActivity } from '../lib/api';
-import { averageSpeedKmh, formatDistance, formatDuration, formatPace } from '../lib/activity';
+import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
+import { syncActivity } from '../lib/activity-sync';
 import { getDemoActivity } from '../lib/demo-data';
-import { useInteractions, usePreviewState } from './interaction-provider';
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
 function RoutePreview({ points, activityType }: { points: SocialActivity['route']; activityType: SocialActivity['type'] }) {
@@ -32,6 +33,18 @@ function contentFor(activity: SocialActivity) {
     const demo = getDemoActivity(activity.id);
     return { location: demo.location, description: demo.description, tags: demo.tags };
   }
+  if (activity.id.startsWith('preview-')) {
+    const name = labelFor(activity.type);
+    return {
+      location: activity.route?.length ? 'Recorded route' : 'Route not shared',
+      description: activity.syncStatus && activity.syncStatus !== 'SYNCED'
+        ? `Completed a ${name.toLowerCase()}. This activity is saved in a device-only preview and has not been published.`
+        : activity.visibility === 'PRIVATE'
+        ? `Completed a ${name.toLowerCase()} and saved it privately.`
+        : `Completed a ${name.toLowerCase()} and shared it with ${activity.visibility === 'PUBLIC' ? 'the Flinkout community' : 'their followers'}.`,
+      tags: [`${name}Activity`, 'KeepMoving'],
+    };
+  }
   if (activity.type === 'RIDE') return { location: 'Downtown Greenway', description: "Light ride before work. The waterfront is always therapeutic. Who's out this weekend?", tags: ['CityRide', 'MorningMiles'] };
   if (activity.type === 'HIKE') return { location: 'Peak Trail Entrance', description: 'A slow climb, wide views, and exactly the kind of quiet morning I needed.', tags: ['TrailDay', 'WeekendHike'] };
   if (activity.type === 'WALK') return { location: 'East Side Park', description: 'A relaxed neighborhood loop with good company and even better weather.', tags: ['DailyWalk', 'TogetherOutside'] };
@@ -43,11 +56,12 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
   const [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const { notify, share } = useInteractions();
-  const { state, toggleReaction: togglePreviewReaction, toggleSaved, toggleHidden } = usePreviewState();
+  const { viewer, mode } = useAppSession();
+  const { state, toggleReaction: togglePreviewReaction, toggleSaved, toggleHidden, postActivity } = usePreviewState();
   const menuRef = useRef<HTMLElement>(null);
-  const isDemo = activity.id.startsWith('demo-');
-  const reacted = isDemo ? state.reactedActivityIds.includes(activity.id) : activity.reactedByViewer;
-  const reactionCount = isDemo ? activity.reactionCount + Number(reacted) - Number(activity.reactedByViewer) : activity.reactionCount;
+  const isPreview = activity.id.startsWith('demo-') || activity.id.startsWith('preview-');
+  const reacted = isPreview ? state.reactedActivityIds.includes(activity.id) : activity.reactedByViewer;
+  const reactionCount = isPreview ? activity.reactionCount + Number(reacted) - Number(activity.reactedByViewer) : activity.reactionCount;
   const saved = state.savedActivityIds.includes(activity.id);
   const hidden = state.hiddenActivityIds.includes(activity.id);
   const paceType = activity.type !== 'RIDE';
@@ -55,7 +69,7 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
   const content = contentFor(activity);
 
   async function toggleReaction() {
-    if (isDemo) {
+    if (isPreview) {
       togglePreviewReaction(activity.id);
       notify(reacted ? 'High-five removed.' : 'High-five sent!');
       return;
@@ -70,6 +84,30 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
       setActivity(previous);
       setError(cause instanceof Error ? cause.message : 'Could not update reaction');
     }
+  }
+
+  async function retryPublish() {
+    if (!activity.clientId || activity.syncStatus === 'SYNCING') return;
+    if (mode !== 'CONNECTED') {
+      notify('Sign in with the account that recorded this activity before retrying.');
+      return;
+    }
+    setActivity(current => ({ ...current, syncStatus: 'SYNCING', syncError: null }));
+    const result = await syncActivity(activity.clientId, viewer.id);
+    if (!result) {
+      setActivity(current => ({ ...current, syncStatus: 'FAILED', syncError: 'Local activity was not found.' }));
+      notify('The saved activity could not be found on this device.');
+      return;
+    }
+    const next: SocialActivity = {
+      ...activity,
+      syncedActivityId: result.syncedActivityId,
+      syncStatus: result.syncStatus,
+      syncError: result.syncError,
+    };
+    setActivity(next);
+    postActivity(next);
+    notify(result.syncStatus === 'SYNCED' ? 'Activity published successfully.' : 'Publishing failed again. Your activity is still saved locally.');
   }
 
   useEffect(() => {
@@ -113,8 +151,12 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
       <Link className="route-play" href={`/activities/${activity.id}`} aria-label="Replay activity"><UiIcon name="play" size={26} /></Link>
     </div>
     <div className="activity-story"><p>{content.description}</p><div>{content.tags.map(tag => <span key={tag}>#{tag}</span>)}</div></div>
+    {activity.syncStatus && activity.syncStatus !== 'SYNCED' && <div className={`activity-sync-state ${activity.syncStatus.toLowerCase()}`} role="status">
+      <span><UiIcon name={activity.syncStatus === 'FAILED' ? 'radio' : 'bookmark'} size={17} /><strong>{mode === 'PREVIEW' ? 'Device-only preview · not published' : activity.syncStatus === 'FAILED' ? 'Saved locally · publishing failed' : activity.syncStatus === 'SYNCING' ? 'Publishing activity…' : 'Saved locally · waiting to publish'}</strong></span>
+      {activity.syncStatus === 'FAILED' && <button onClick={() => void retryPublish()}>Retry</button>}
+    </div>}
     <footer className="activity-actions">
-      <div><button className={reacted ? 'reacted reaction-pop' : ''} onClick={toggleReaction} aria-pressed={reacted}><UiIcon name="heart" /> {reactionCount}</button><Link href={`/activities/${activity.id}#comments`}><UiIcon name="chat" /> {activity.commentCount}</Link><button aria-label="Share activity" onClick={() => void share({ title: `${content.location} on Flinkout`, text: content.description, url: `${window.location.origin}/activities/${activity.id}` })}><UiIcon name="share" /></button></div>
+      <div><button className={reacted ? 'reacted reaction-pop' : ''} onClick={toggleReaction} aria-label={reacted ? 'Remove high-five' : 'Send high-five'} aria-pressed={reacted}><UiIcon name="highfive" /> {reactionCount}</button><Link href={`/activities/${activity.id}#comments`}><UiIcon name="chat" /> {activity.commentCount}</Link><button aria-label="Share activity" onClick={() => void share({ title: `${content.location} on Flinkout`, text: content.description, url: `${window.location.origin}/activities/${activity.id}` })}><UiIcon name="share" /></button></div>
       <button className={saved ? 'saved' : ''} onClick={() => { toggleSaved(activity.id); notify(saved ? 'Removed from saved activities.' : 'Activity saved for later.'); }} aria-label={saved ? 'Remove bookmark' : 'Bookmark activity'} aria-pressed={saved}><UiIcon name="bookmark" /></button>
     </footer>
     {error && <p className="error card-error" role="alert">{error}</p>}

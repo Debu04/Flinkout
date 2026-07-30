@@ -2,7 +2,24 @@ export type Profile = { displayName: string; bio: string | null; photoUrl: strin
 export type User = { id: string; email?: string; username: string; profile: Profile | null; isFollowing?: boolean; isSelf?: boolean };
 export type SocialUser = { id: string; username: string; profile: { displayName: string; photoUrl: string | null } | null };
 export type ActivityPoint = { latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; recordedAt: string };
-export type SocialActivity = { id: string; type: 'WALK' | 'RUN' | 'RIDE' | 'HIKE'; visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE'; startedAt: string; endedAt: string | null; durationS: number; distanceM: number; route: ActivityPoint[] | null; user: SocialUser; reactionCount: number; commentCount: number; reactedByViewer: boolean };
+export type SocialActivity = {
+  id: string;
+  clientId?: string;
+  syncedActivityId?: string | null;
+  syncStatus?: 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
+  syncError?: string | null;
+  type: 'WALK' | 'RUN' | 'RIDE' | 'HIKE';
+  visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+  startedAt: string;
+  endedAt: string | null;
+  durationS: number;
+  distanceM: number;
+  route: ActivityPoint[] | null;
+  user: SocialUser;
+  reactionCount: number;
+  commentCount: number;
+  reactedByViewer: boolean;
+};
 export type Comment = { id: string; body: string; createdAt: string; userId: string; isOwner: boolean; user: SocialUser };
 export type NearbyPerson = { id: string; username: string; displayName: string; photoUrl: string | null; latitude: number; longitude: number; distanceKm: number };
 export type NearbyActivity = { id: string; type: 'WALK' | 'RUN' | 'RIDE' | 'HIKE'; startedAt: string; distanceM: number; latitude: number; longitude: number; distanceKm: number; route: ActivityPoint[] | null; user: { id: string; username: string; displayName: string; photoUrl: string | null } };

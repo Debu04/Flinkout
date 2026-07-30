@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useInteractions, usePreviewState } from '../components/interaction-provider';
+import { useAppSession, useInteractions, usePreviewState } from '../components/interaction-provider';
 import { SocialFeed } from '../components/social-feed';
+import { UiIcon } from '../components/ui-icon';
 
 const livePeople = [
   { name: 'Sienna', username: 'sienna_trails', initial: 'S', tone: 'mountain' },
@@ -13,9 +14,14 @@ const livePeople = [
 ];
 
 function LiveNearby() {
+  const { mode } = useAppSession();
+  if (mode === 'CONNECTED') return <section className="live-nearby live-nearby-connected">
+    <div className="trail-section-heading"><h1><span className="live-pulse" />Live Nearby</h1><Link href="/map">Open map</Link></div>
+    <Link href="/map" className="live-home-empty"><UiIcon name="radio" /><span><strong>Find active people near you</strong><small>Choose Locate on the map to search using your approximate position.</small></span><b>Explore</b></Link>
+  </section>;
   return <section className="live-nearby">
-    <div className="trail-section-heading"><h1><span className="live-pulse" />Live Nearby</h1><Link href="/map">View map</Link></div>
-    <div className="live-people" aria-label="People sharing live activities nearby">
+    <div className="trail-section-heading"><h1><span className="live-pulse" />Live Nearby <small>Preview</small></h1><Link href="/map">View map</Link></div>
+    <div className="live-people" aria-label="Sample people sharing live activities nearby">
       {livePeople.map(person => <Link href={`/u/${person.username}`} className="live-person" key={person.username}>
         <span className={`live-avatar ${person.tone}`}><span>{person.initial}</span><b>LIVE</b></span>
         <small>{person.name}</small>
@@ -81,15 +87,18 @@ function LocalHeatmap() {
 
 export default function Home() {
   const { notify } = useInteractions();
+  const { mode } = useAppSession();
   return <section className="trail-home">
     <div className="trail-feed-column">
       <LiveNearby />
       <SocialFeed />
     </div>
     <aside className="trail-aside">
-      <StartingSoon />
-      <BuddyDiscovery />
-      <LocalHeatmap />
+      {mode === 'CONNECTED' ? <section className="trail-panel connected-quick-actions"><header><h2>Quick actions</h2><span className="panel-icon">READY</span></header><Link href="/record"><UiIcon name="activity" /><span><strong>Start an activity</strong><small>Record with offline backup</small></span></Link><Link href="/map"><UiIcon name="map" /><span><strong>Find live movement</strong><small>Use approximate nearby discovery</small></span></Link><Link href="/profile"><UiIcon name="profile" /><span><strong>My activity</strong><small>Review your movement history</small></span></Link></section> : <>
+        <StartingSoon />
+        <BuddyDiscovery />
+        <LocalHeatmap />
+      </>}
       <section className="premium-banner"><span>PREMIUM TRAIL GUIDE</span><strong>Unlock 500+ Hidden Trails</strong><button onClick={() => notify('Premium plans are coming soon. You are on the preview list.')}>Go premium</button></section>
     </aside>
   </section>;

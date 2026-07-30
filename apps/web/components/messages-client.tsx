@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useInteractions, usePreviewState } from './interaction-provider';
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
+import { UiIcon } from './ui-icon';
 
 type Conversation = {
   id: string;
@@ -42,6 +43,7 @@ export function MessagesClient() {
   const [selectedId, setSelectedId] = useState('');
   const [draft, setDraft] = useState('');
   const { state, addMessage } = usePreviewState();
+  const { mode } = useAppSession();
   const { notify } = useInteractions();
   const visible = tab === 'CHATS' ? chats : groups;
   const allConversations = useMemo(() => [liveConversation, ...chats, ...groups], []);
@@ -57,15 +59,17 @@ export function MessagesClient() {
     if (!body || !selected) return;
     addMessage(selected.id, body);
     setDraft('');
-    notify('Message sent and saved in this preview.');
+    notify('Message saved in this device-only messaging preview.');
   }
 
   function choose(conversation: Conversation) {
     setSelectedId(conversation.id);
     setDraft('');
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
   }
 
   return <section className={`messages-page messaging-layout ${selected ? 'has-conversation' : ''}`}>
+    <div className="messages-product-note" role="status"><UiIcon name="chat" size={18} /><span><strong>Messaging preview</strong><small>{mode === 'CONNECTED' ? 'These sample conversations do not send messages to other accounts yet.' : 'Sample chats and your replies are stored only on this device.'}</small></span></div>
     <aside className="conversations-pane" aria-label="Conversations">
       <div className="messages-tabs" role="tablist" aria-label="Message categories">
         <button id="chats-tab" role="tab" aria-controls="conversation-list" aria-selected={tab === 'CHATS'} onClick={() => setTab('CHATS')}>Chats</button>
@@ -94,7 +98,7 @@ export function MessagesClient() {
           {selected.baseMessages.map((message, index) => <p className={`message-bubble ${message.direction}`} key={`${selected.id}-base-${index}`}>{message.body}</p>)}
           {(state.messages[selected.id] ?? []).map(message => <p className="message-bubble outgoing" key={message.id}>{message.body}<small>Sent</small></p>)}
         </div>
-        <form className="message-composer" onSubmit={send}><label className="sr-only" htmlFor="message-draft">Message {selected.name}</label><input id="message-draft" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message..." autoComplete="off" /><button disabled={!draft.trim()}>Send</button></form>
+        <form className="message-composer" onSubmit={send}><label className="sr-only" htmlFor="message-draft">Preview a message to {selected.name}</label><input id="message-draft" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a preview reply…" autoComplete="off" /><button disabled={!draft.trim()}>Save reply</button></form>
       </> : <div className="empty-state"><h2>Select a conversation</h2><p>Your chats and group activity will appear here.</p></div>}
     </section>
   </section>;

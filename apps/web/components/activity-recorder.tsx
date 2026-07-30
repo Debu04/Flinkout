@@ -1,12 +1,13 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ACTIVITY_TYPES, averageSpeedKmh, distanceBetween, elapsedSeconds, formatDistance, formatDuration, formatPace, labelFor, shouldKeepPoint, type ActivityType, type LocalActivity, type RoutePoint } from '../lib/activity';
 import { deleteActivity, getIncompleteActivity, putActivity } from '../lib/activity-db';
 import { syncActivity, syncPendingActivities } from '../lib/activity-sync';
-import { api } from '../lib/api';
-import { useInteractions } from './interaction-provider';
+import { api, type SocialActivity } from '../lib/api';
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
 const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map map-loading" aria-label="Loading route map">Loading map...</div> });
@@ -14,6 +15,7 @@ type Screen = 'PICKER' | 'LIVE' | 'SUMMARY';
 const now = () => new Date().toISOString();
 
 export function ActivityRecorder() {
+  const router = useRouter();
   const [activity, setActivity] = useState<LocalActivity>();
   const [screen, setScreen] = useState<Screen>('PICKER');
   const [selected, setSelected] = useState<ActivityType>('WALK');
@@ -22,9 +24,14 @@ export function ActivityRecorder() {
   const [elapsed, setElapsed] = useState(0);
   const [live, setLive] = useState(false);
   const [livePending, setLivePending] = useState(false);
-  const [goLive, setGoLive] = useState(false);
   const [liveMessage, setLiveMessage] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  const [storageState, setStorageState] = useState<'CHECKING' | 'READY' | 'ERROR'>('CHECKING');
+  const [shortActivityWarning, setShortActivityWarning] = useState(false);
   const { notify } = useInteractions();
+  const { postActivity } = usePreviewState();
+  const { viewer, mode } = useAppSession();
   const watchId = useRef<number | undefined>(undefined);
   const activityRef = useRef<LocalActivity | undefined>(undefined);
 
@@ -36,29 +43,42 @@ export function ActivityRecorder() {
   useEffect(() => {
     const update = () => {
       setOnline(navigator.onLine);
-      if (navigator.onLine) void syncPendingActivities().then(results => {
-        const latest = results.find(result => result?.clientId === activityRef.current?.clientId);
-        if (latest) { activityRef.current = latest; setActivity(latest); }
-      });
     };
     setOnline(navigator.onLine);
-    if (navigator.onLine) void syncPendingActivities();
     addEventListener('online', update);
     addEventListener('offline', update);
     getIncompleteActivity().then(found => {
+      setStorageState('READY');
       if (found) {
         setActivity(found);
         setSelected(found.type);
         setScreen(found.status === 'FINISHED' ? 'SUMMARY' : 'LIVE');
         setGps(found.status === 'PAUSED' ? 'Recording restored and paused.' : 'Recording restored. Reconnecting to GPS...');
       }
-    }).catch(() => setGps('Local storage is unavailable.'));
+    }).catch(() => {
+      setStorageState('ERROR');
+      setGps('Local storage is unavailable. Recording cannot start safely.');
+    }).finally(() => setRestoring(false));
     return () => {
       removeEventListener('online', update);
       removeEventListener('offline', update);
       if (watchId.current !== undefined) navigator.geolocation?.clearWatch(watchId.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'CONNECTED' || !navigator.onLine) return;
+    const syncOwned = () => {
+      if (!navigator.onLine) return;
+      void syncPendingActivities(viewer.id).then(results => {
+        const latest = results.find(result => result?.clientId === activityRef.current?.clientId);
+        if (latest) { activityRef.current = latest; setActivity(latest); }
+      });
+    };
+    syncOwned();
+    addEventListener('online', syncOwned);
+    return () => removeEventListener('online', syncOwned);
+  }, [mode, viewer.id]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -70,7 +90,10 @@ export function ActivityRecorder() {
   const persist = useCallback((next: LocalActivity) => {
     activityRef.current = next;
     setActivity(next);
-    void putActivity(next);
+    void putActivity(next).then(() => setStorageState('READY')).catch(() => {
+      setStorageState('ERROR');
+      setGps('This activity could not be saved on this device. Keep this page open and try again.');
+    });
   }, []);
 
   const stopWatch = useCallback(() => {
@@ -125,6 +148,14 @@ export function ActivityRecorder() {
   async function startLive() {
     const current = activityRef.current;
     const routePoint = current?.route.at(-1);
+    if (mode !== 'CONNECTED') {
+      setLiveMessage('Sign in to share live progress with nearby followers.');
+      return;
+    }
+    if (!navigator.onLine) {
+      setLiveMessage('Live sharing needs a connection. Your recording remains safe on this device.');
+      return;
+    }
     if (!current || !routePoint) {
       setLiveMessage('GPS needs one accurate point before live sharing can start.');
       return;
@@ -138,7 +169,6 @@ export function ActivityRecorder() {
       setLiveMessage('Live sharing is on. Only approximate updates are sent every 15 seconds.');
     } catch {
       setLive(false);
-      setGoLive(false);
       setLiveMessage('Live sharing could not connect. Your activity is still recording safely on this device.');
     } finally {
       setLivePending(false);
@@ -146,17 +176,19 @@ export function ActivityRecorder() {
   }
 
   async function stopLiveSharing() {
-    if (live) await api('/live/current', { method: 'DELETE' }).catch(() => undefined);
-    setLive(false);
-    setGoLive(false);
-    setLiveMessage('Live sharing is off. GPS recording continues only on this device.');
+    if (!live || livePending) return;
+    setLivePending(true);
+    setLiveMessage('Stopping live sharing...');
+    try {
+      await api('/live/current', { method: 'DELETE' });
+      setLive(false);
+      setLiveMessage('Live sharing is off. GPS recording continues only on this device.');
+    } catch {
+      setLiveMessage('We could not confirm that live sharing stopped. Keep this page open and retry.');
+    } finally {
+      setLivePending(false);
+    }
   }
-
-  useEffect(() => {
-    if (goLive && !live && !livePending && activity?.route.length) void startLive();
-    // startLive uses the current activity ref and is only triggered by these state transitions.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goLive, live, livePending, activity?.route.length]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -169,28 +201,23 @@ export function ActivityRecorder() {
     return () => clearInterval(timer);
   }, [live]);
 
-  const attemptSync = useCallback(async (clientId: string) => {
-    const result = await syncActivity(clientId);
-    if (result && activityRef.current?.clientId === result.clientId) {
-      activityRef.current = result;
-      setActivity(result);
-    }
-  }, []);
-
   useEffect(() => {
     const retry = setInterval(() => {
-      if (navigator.onLine) void syncPendingActivities();
+      if (mode === 'CONNECTED' && navigator.onLine) void syncPendingActivities(viewer.id);
     }, 30_000);
     return () => clearInterval(retry);
-  }, []);
+  }, [mode, viewer.id]);
 
   function start() {
+    if (restoring || storageState !== 'READY') return;
     const time = now();
     const created: LocalActivity = {
       clientId: crypto.randomUUID(),
+      ownerId: viewer.id,
       type: selected,
-      visibility: 'PRIVATE',
+      visibility: 'FOLLOWERS',
       status: 'RECORDING',
+      published: false,
       syncStatus: 'LOCAL',
       syncError: null,
       syncedActivityId: null,
@@ -205,7 +232,7 @@ export function ActivityRecorder() {
       updatedAt: time,
     };
     persist(created);
-    if (goLive) setLiveMessage('Live sharing will begin after the first accurate GPS point.');
+    beginWatch();
     setScreen('LIVE');
   }
 
@@ -225,21 +252,85 @@ export function ActivityRecorder() {
   function finish() {
     const current = activityRef.current;
     if (!current) return;
+    if (elapsedSeconds(current) < 30) {
+      setShortActivityWarning(true);
+      return;
+    }
     stopWatch();
     if (live) void api('/live/current', { method: 'DELETE' });
     setLive(false);
     const finished: LocalActivity = {
       ...current,
       status: 'FINISHED',
-      syncStatus: navigator.onLine ? 'PENDING' : 'LOCAL',
+      published: false,
+      syncStatus: 'LOCAL',
       endedAt: now(),
       elapsedBeforePauseS: elapsedSeconds(current),
       activeSince: null,
       updatedAt: now(),
     };
     persist(finished);
+    setShortActivityWarning(false);
     setScreen('SUMMARY');
-    if (navigator.onLine) void attemptSync(finished.clientId);
+  }
+
+  async function publish() {
+    const current = activityRef.current;
+    if (!current || current.status !== 'FINISHED' || posting) return;
+    setPosting(true);
+    const published: LocalActivity = {
+      ...current,
+      published: true,
+      syncStatus: mode === 'CONNECTED' && navigator.onLine ? 'PENDING' : 'LOCAL',
+      syncError: null,
+      updatedAt: now(),
+    };
+    const feedActivity: SocialActivity = {
+      id: `preview-${current.clientId}`,
+      clientId: current.clientId,
+      syncedActivityId: null,
+      syncStatus: published.syncStatus,
+      syncError: null,
+      type: current.type,
+      visibility: current.visibility,
+      startedAt: current.startedAt,
+      endedAt: current.endedAt,
+      durationS: current.elapsedBeforePauseS,
+      distanceM: current.distanceM,
+      route: current.route,
+      user: {
+        id: viewer.id,
+        username: viewer.username,
+        profile: { displayName: viewer.profile?.displayName ?? viewer.username, photoUrl: viewer.profile?.photoUrl ?? null },
+      },
+      reactionCount: 0,
+      commentCount: 0,
+      reactedByViewer: false,
+    };
+    activityRef.current = published;
+    setActivity(published);
+    await putActivity(published);
+    let finalActivity = published;
+    if (navigator.onLine && mode === 'CONNECTED') {
+      const result = await syncActivity(published.clientId, viewer.id);
+      if (result) finalActivity = result;
+    }
+    postActivity({
+      ...feedActivity,
+      syncedActivityId: finalActivity.syncedActivityId,
+      syncStatus: finalActivity.syncStatus,
+      syncError: finalActivity.syncError,
+    });
+    setActivity(finalActivity);
+    activityRef.current = finalActivity;
+    notify(finalActivity.syncStatus === 'SYNCED'
+      ? 'Activity published and synced.'
+      : finalActivity.syncStatus === 'FAILED'
+        ? 'Activity saved locally. Publishing failed; you can retry from the feed.'
+        : mode === 'PREVIEW'
+          ? 'Activity added to your private preview feed on this device.'
+          : 'Activity saved locally and queued for publishing.');
+    router.push('/');
   }
 
   async function discard() {
@@ -262,35 +353,41 @@ export function ActivityRecorder() {
   if (screen === 'PICKER') return <section className="movement-setup">
     <div className="movement-map-backdrop" />
     <section className="movement-picker card">
-      <header><h1>Ready for a move?</h1><p>Select your activity and set your recording preferences.</p></header>
+      <header><p className="eyebrow">NEW ACTIVITY</p><h1>What are you doing?</h1><p>Choose a movement. Recording stays on this device even if your connection drops.</p></header>
       <div className="movement-types">{ACTIVITY_TYPES.map(type => <button className={type === selected ? 'selected' : ''} onClick={() => setSelected(type)} key={type} aria-pressed={type === selected}><span><UiIcon name={{ WALK: 'walk', RUN: 'run', RIDE: 'bike', HIKE: 'hike' }[type] as 'walk' | 'run' | 'bike' | 'hike'} size={30} /></span><strong>{labelFor(type)}</strong></button>)}</div>
-      <section className="daily-goal recording-readiness"><div><span>Recording mode</span><p><strong>GPS + offline backup</strong></p></div><b>Device ready</b><i><span /></i></section>
-      <button className="go-live-toggle" onClick={() => setGoLive(value => !value)} aria-pressed={goLive}><span><b>Optional live sharing</b><small>Share approximate progress with eligible nearby followers.</small></span><i className={goLive ? 'on' : ''}><em /></i></button>
-      <button className="start-movement-button" onClick={start}><UiIcon name="play" />Start Movement <span>Go</span></button>
+      <section className={`daily-goal recording-readiness ${storageState.toLowerCase()}`} aria-live="polite"><div><span>Recording mode</span><p><strong>GPS + offline backup</strong></p></div><b>{restoring ? 'Checking device…' : storageState === 'READY' ? 'Ready to record' : 'Storage unavailable'}</b><i><span /></i></section>
+      <p className="recording-privacy-note"><UiIcon name="shield" size={18} /> Live sharing becomes available after you start and GPS finds your location.</p>
+      <button className="start-movement-button" onClick={start} disabled={restoring || storageState !== 'READY'}><UiIcon name="play" />{restoring ? 'Checking device…' : `Start ${labelFor(selected).toLowerCase()}`} <span>Go</span></button>
     </section>
   </section>;
 
   if (!activity) return null;
   if (screen === 'SUMMARY') return <section className="record-shell stack">
-    <div className="hero"><h1>{labelFor(activity.type)} complete</h1><p className="summary-date">{new Date(activity.startedAt).toLocaleString()}</p></div>
-    <RouteMap points={activity.route} />
+    <div className="hero activity-review-heading"><span className="review-complete-icon"><UiIcon name="highfive" /></span><div><p>Activity complete</p><h1>Review your {labelFor(activity.type).toLowerCase()}</h1><small className="summary-date">{new Date(activity.startedAt).toLocaleString()}</small></div></div>
+    {activity.route.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state"><UiIcon name="map" size={30} /><strong>No route recorded</strong><span>Your time is still saved. Enable location before your next activity to include a route.</span></div>}
     <Metrics activity={activity} seconds={seconds} speed={speed} pace={pace} />
-    <section className="card stack"><label className="field">Activity visibility<select value={activity.visibility} disabled={activity.syncStatus === 'SYNCED'} onChange={event => persist({ ...activity, visibility: event.target.value as LocalActivity['visibility'], updatedAt: now() })}><option value="PRIVATE">Private</option><option value="FOLLOWERS">Followers only</option><option value="PUBLIC">Public</option></select></label><SyncStatus activity={activity} /><p className="hint">The route remains on this device until the server confirms storage.</p><div className="row">{activity.syncStatus !== 'SYNCED' && <button className="button" onClick={() => void attemptSync(activity.clientId)} disabled={!online || activity.syncStatus === 'SYNCING'}>{activity.syncStatus === 'SYNCING' ? 'Syncing...' : activity.syncStatus === 'FAILED' ? 'Retry sync' : 'Sync now'}</button>}<button className="button danger" onClick={discard}>{activity.syncStatus === 'SYNCED' ? 'Remove local copy' : 'Discard activity'}</button></div></section>
+    <section className="card stack activity-publish-card">
+      <div><p className="eyebrow">FINAL STEP</p><h2>Choose who can see it</h2><p>{activity.route.length ? 'Review your route and metrics before publishing.' : 'No GPS route was captured. Only the activity type and time will be included.'}</p></div>
+      <label className="field">Who can see this activity?<select value={activity.visibility} onChange={event => persist({ ...activity, visibility: event.target.value as LocalActivity['visibility'], updatedAt: now() })}><option value="FOLLOWERS">Followers</option><option value="PUBLIC">Everyone</option><option value="PRIVATE">Only me</option></select></label>
+      <p className="local-save-status"><UiIcon name="bookmark" size={18} /> Saved safely on this device · not published yet</p>
+      <div className="summary-actions"><button className="button post-activity-button" onClick={() => void publish()} disabled={posting}><UiIcon name={activity.visibility === 'PRIVATE' ? 'lock' : 'share'} />{posting ? 'Publishing…' : activity.visibility === 'PRIVATE' ? 'Save privately' : 'Post activity'}</button><button className="button discard-activity-button" onClick={discard} disabled={posting}>Discard</button></div>
+    </section>
   </section>;
 
   return <section className="live-tracking-screen">
     <div className="live-tracking-map">
-      <RouteMap points={activity.route} />
+      {activity.route.length ? <RouteMap points={activity.route} /> : <div className="recording-route-placeholder"><UiIcon name="location" size={30} /><span>Finding your location…</span></div>}
       <span className={`live-session-chip ${live ? 'sharing' : ''}`}><i /> {live ? 'Live sharing' : activity.status === 'PAUSED' ? 'Recording paused' : 'Recording locally'} - {labelFor(activity.type)}</span>
       <section className="recording-map-status"><span>{online ? 'Online' : 'Offline safe'}</span><span>{activity.route.length ? `${activity.route.length} GPS samples` : 'Waiting for GPS'}</span></section>
     </div>
     <section className="live-metrics-panel">
       <div className="live-primary-metrics"><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
       <div className="live-secondary-metrics"><span><small>GPS samples</small><strong>{activity.route.length}</strong></span><span><small>Connection</small><strong>{online ? 'Online' : 'Offline safe'}</strong></span></div>
-      <p className={`status ${gps.includes('denied') || gps.includes('unavailable') ? 'warning' : ''}`} role="status">{gps}</p>
-      {liveMessage && <p className={`hint ${livePending ? 'pending' : ''}`}>{liveMessage}</p>}
-      <div className="live-controls"><button onClick={pauseResume}><UiIcon name={activity.status === 'PAUSED' ? 'play' : 'pause'} />{activity.status === 'PAUSED' ? 'Resume' : 'Pause'}</button><button onClick={finish}><UiIcon name="stop" />End Session</button></div>
-      <button className={`live-share-control ${live ? 'active' : ''}`} disabled={livePending} onClick={() => void (live ? stopLiveSharing() : startLive())}>{livePending ? 'Connecting...' : live ? 'Stop live sharing' : 'Share this activity live'}</button>
+      <p className={`status ${gps.includes('denied') || gps.includes('unavailable') ? 'warning' : ''}`} role="status">{gps}{gps.includes('denied') || gps.includes('unavailable') ? ' Timing continues, so you can finish and post without a route.' : ''}</p>
+      {liveMessage && <p className={`hint live-sharing-message ${livePending ? 'pending' : ''}`} role="status">{liveMessage}</p>}
+      {shortActivityWarning && <div className="short-activity-warning" role="alert"><strong>Keep moving a little longer</strong><span>An activity needs at least 30 seconds before it can be reviewed and posted.</span><div><button onClick={() => setShortActivityWarning(false)}>Keep recording</button><button onClick={() => void discard()}>Discard activity</button></div></div>}
+      <div className="live-controls"><button onClick={pauseResume}><UiIcon name={activity.status === 'PAUSED' ? 'play' : 'pause'} />{activity.status === 'PAUSED' ? 'Resume' : 'Pause'}</button><button onClick={finish}><UiIcon name="stop" />Finish &amp; review</button></div>
+      {activity.route.length ? <button className={`live-share-control ${live ? 'active' : ''}`} disabled={livePending || (!live && (mode !== 'CONNECTED' || !online))} onClick={() => void (live ? stopLiveSharing() : startLive())}>{livePending ? (live ? 'Stopping…' : 'Connecting…') : live ? 'Stop live sharing' : mode === 'CONNECTED' ? 'Share this activity live' : 'Sign in to share live'}</button> : <p className="live-share-unavailable"><UiIcon name="radio" size={17} /> Live sharing will appear after GPS locks.</p>}
     </section>
   </section>;
 }
@@ -298,9 +395,4 @@ export function ActivityRecorder() {
 function Metrics({ activity, seconds, speed, pace }: { activity: LocalActivity; seconds: number; speed: number; pace: string }) {
   const paceActivity = activity.type === 'WALK' || activity.type === 'RUN' || activity.type === 'HIKE';
   return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? 'Average pace' : 'Average speed'}</span></div><div className="metric"><strong>{activity.route.length}</strong><span>GPS samples</span></div></section>;
-}
-
-function SyncStatus({ activity }: { activity: LocalActivity }) {
-  const text = activity.syncStatus === 'SYNCED' ? 'Synced' : activity.syncStatus === 'SYNCING' ? 'Syncing...' : activity.syncStatus === 'FAILED' ? `Sync failed - ${activity.syncError ?? 'Retry'}` : activity.syncStatus === 'PENDING' ? 'Waiting to sync' : 'Saved on this device';
-  return <p className={`status ${activity.syncStatus === 'FAILED' ? 'warning' : ''}`} role="status">{text}</p>;
 }

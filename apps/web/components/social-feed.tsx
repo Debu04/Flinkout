@@ -5,10 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type SocialActivity } from '../lib/api';
 import { demoFeed } from '../lib/demo-data';
 import { ActivityCard, FeedSkeleton } from './activity-card';
-import { useInteractions, usePreviewState } from './interaction-provider';
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
+import { UiIcon } from './ui-icon';
 
 type Feed = { activities: SocialActivity[]; nextCursor: string | null };
-type FeedMode = 'ALL' | 'FOLLOWING' | 'YOU';
 
 const sessions = [
   { id: 'misty', activityId: 'demo-walk', name: 'Sunday Sunrise Walk', distance: 'East Side Park - 2.4 km away', starts: 'Starts in 18m', faces: 'M T E +12', tone: 'mist' },
@@ -48,67 +48,58 @@ export function SocialFeed() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [more, setMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [preview, setPreview] = useState(false);
-  const [mode, setMode] = useState<FeedMode>('ALL');
+  const [feedError, setFeedError] = useState('');
   const { state } = usePreviewState();
-  const { notify } = useInteractions();
+  const { mode, viewer } = useAppSession();
 
   const load = useCallback(async (next?: string) => {
+    if (mode === 'CHECKING') return;
     if (next) setMore(true);
     else setLoading(true);
+    setFeedError('');
     try {
       const page = await api<Feed>(`/activities/feed${next ? `?cursor=${encodeURIComponent(next)}` : ''}`);
       setItems(current => next ? [...current, ...page.activities] : page.activities);
       setCursor(page.nextCursor);
-      setPreview(false);
-    } catch {
+    } catch (cause) {
       if (!next) {
-        setItems(demoFeed);
+        setItems(mode === 'PREVIEW' ? demoFeed : []);
         setCursor(null);
-        setPreview(true);
+        if (mode === 'CONNECTED') setFeedError(cause instanceof Error ? cause.message : 'Your activity feed could not be loaded.');
       }
     } finally {
       setLoading(false);
       setMore(false);
     }
-  }, []);
+  }, [mode]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (mode !== 'CHECKING') void load();
+  }, [load, mode]);
 
   const visibleItems = useMemo(() => {
-    if (mode === 'YOU') return items.filter(item => item.user.username === 'marcus_moves');
-    if (mode === 'FOLLOWING') return items.filter(item => state.followingUsernames.includes(item.user.username));
-    return items;
-  }, [items, mode, state.followingUsernames]);
-
-  async function refresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-    notify(preview ? 'Preview feed refreshed.' : 'You are all caught up.');
-  }
+    return [
+      ...state.postedActivities.filter(item => item.durationS >= 30 && (mode !== 'CONNECTED' || item.user.id === viewer.id) && !items.some(remote =>
+        remote.id === item.id
+        || (item.clientId && remote.clientId === item.clientId)
+        || (item.syncedActivityId && remote.id === item.syncedActivityId)
+      )),
+      ...items,
+    ];
+  }, [items, mode, state.postedActivities, viewer.id]);
 
   if (loading) return <section className="stack" aria-label="Loading activity feed"><FeedSkeleton /><FeedSkeleton /></section>;
+  if (feedError) return <section className="card feed-error-state" role="alert"><UiIcon name="radio" size={26} /><div><h2>Feed unavailable</h2><p>{feedError}. Your locally recorded activities remain safe.</p></div><button onClick={() => void load()}>Try again</button></section>;
 
   return <section className="feed stack">
-    <div className="feed-toolbar">
-      <div className="feed-tabs" role="tablist" aria-label="Feed filters">
-        <button role="tab" aria-selected={mode === 'ALL'} onClick={() => setMode('ALL')}>Nearby</button>
-        <button role="tab" aria-selected={mode === 'FOLLOWING'} onClick={() => setMode('FOLLOWING')}>Following</button>
-        <button role="tab" aria-selected={mode === 'YOU'} onClick={() => setMode('YOU')}>You</button>
-      </div>
-      <button className="feed-refresh" onClick={() => void refresh()} disabled={refreshing} aria-label="Refresh activity feed">{refreshing ? 'Refreshing...' : 'Refresh'}</button>
-    </div>
-    {preview && <p className="demo-note">Interactive preview - reactions, saves, follows, joins, comments, and messages persist in this browser.</p>}
     {visibleItems.length ? visibleItems.map((item, index) => <div className="feed-entry" key={item.id}>
       <ActivityCard initial={item} />
-      {index === 0 && mode === 'ALL' && <StartingSoonMobile />}
-      {index === visibleItems.length - 1 && mode === 'ALL' && <BuddySpotlightMobile />}
+      {mode === 'PREVIEW' && index === 0 && <StartingSoonMobile />}
+      {mode === 'PREVIEW' && index === visibleItems.length - 1 && <BuddySpotlightMobile />}
     </div>) : <section className="card empty-state">
-      <h2>{mode === 'FOLLOWING' ? 'Follow a few movers' : 'Nothing here yet'}</h2>
-      <p>{mode === 'FOLLOWING' ? 'People you follow will appear here. Explore nearby profiles to build your feed.' : 'Record an activity to start your movement history.'}</p>
-      <Link className="button" href={mode === 'FOLLOWING' ? '/explore' : '/record'}>{mode === 'FOLLOWING' ? 'Explore people' : 'Start an activity'}</Link>
+      <h2>Nothing here yet</h2>
+      <p>Record an activity to start your movement history.</p>
+      <Link className="button" href="/record">Start an activity</Link>
     </section>}
     {cursor && <button className="button secondary" disabled={more} onClick={() => void load(cursor)}>{more ? 'Loading...' : 'Load more'}</button>}
   </section>;

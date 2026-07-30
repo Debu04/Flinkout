@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ACTIVITY_TYPES, averageSpeedKmh, distanceBetween, elapsedSeconds, formatPace, labelFor, shouldKeepPoint, type LocalActivity, type RoutePoint } from './activity';
 
 const point = (latitude: number, longitude: number, recordedAt = '2026-07-19T10:00:00.000Z'): RoutePoint => ({ latitude, longitude, accuracy: 5, altitude: null, speed: null, recordedAt });
-const recording: LocalActivity = { clientId: '00000000-0000-4000-8000-000000000000', type: 'RUN', visibility: 'PRIVATE', status: 'RECORDING', syncStatus: 'LOCAL', syncError: null, syncedActivityId: null, lastSyncAttemptAt: null, startedAt: '2026-07-19T10:00:00.000Z', endedAt: null, elapsedBeforePauseS: 30, activeSince: '2026-07-19T10:01:00.000Z', distanceM: 1000, route: [], createdAt: '2026-07-19T10:00:00.000Z', updatedAt: '2026-07-19T10:01:00.000Z' };
+const recording: LocalActivity = { clientId: '00000000-0000-4000-8000-000000000000', type: 'RUN', visibility: 'PRIVATE', status: 'RECORDING', published: false, syncStatus: 'LOCAL', syncError: null, syncedActivityId: null, lastSyncAttemptAt: null, startedAt: '2026-07-19T10:00:00.000Z', endedAt: null, elapsedBeforePauseS: 30, activeSince: '2026-07-19T10:01:00.000Z', distanceM: 1000, route: [], createdAt: '2026-07-19T10:00:00.000Z', updatedAt: '2026-07-19T10:01:00.000Z' };
 describe('activity metrics', () => {
   it('supports walking, running, cycling, and hiking', () => { expect(ACTIVITY_TYPES).toEqual(['WALK', 'RUN', 'RIDE', 'HIKE']); expect(ACTIVITY_TYPES.map(labelFor)).toEqual(['Walk', 'Run', 'Ride', 'Hike']); });
   it('calculates a roughly 1 km route segment', () => expect(distanceBetween(point(0, 0), point(0, 0.008993))).toBeCloseTo(1000, -1));

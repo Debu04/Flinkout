@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { UiIcon } from './ui-icon';
-import { usePreviewState } from './interaction-provider';
+import { useAppSession, usePreviewState } from './interaction-provider';
 
 const desktopNavigation = [
   { href: '/', label: 'Home', icon: 'home' as const },
@@ -39,6 +39,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const notificationsButtonRef = useRef<HTMLButtonElement>(null);
   const { state, markNotificationsRead } = usePreviewState();
+  const { viewer, mode } = useAppSession();
+  const viewerName = viewer.profile?.displayName ?? viewer.username;
+  const viewerInitial = viewerName[0]?.toUpperCase() ?? 'F';
 
   useEffect(() => { setMenuOpen(false); setNotificationsOpen(false); }, [path]);
   useEffect(() => {
@@ -88,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  return <div className={`layout ${ownsHeader ? 'owns-mobile-header' : ''}`}>
+  return <div className={`layout ${ownsHeader ? 'owns-mobile-header' : ''} ${mode === 'PREVIEW' ? 'preview-mode' : ''}`}>
     <header className="desktop-topbar">
       <Link className="topbar-brand" href="/"><span className="brand-mark">F</span><strong>Flinkout</strong></Link>
       <form className="topbar-search" onSubmit={search}>
@@ -106,20 +109,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <button ref={menuButtonRef} className="mobile-menu" aria-label="Open navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><span /><span /><span /></button>
       <Link href="/" className="mobile-wordmark">Flinkout</Link>
       <button ref={notificationsButtonRef} className="mobile-notification" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={toggleNotifications}><UiIcon name="bell" />{!state.notificationsRead && <span />}</button>
-      <Link href="/profile" className="mobile-profile-link" aria-label="Open my profile">M</Link>
+      <Link href="/profile" className="mobile-profile-link" aria-label="Open my profile">{viewer.profile?.photoUrl ? <img src={viewer.profile.photoUrl} alt="" /> : viewerInitial}</Link>
     </header>}
 
     {notificationsOpen && <aside ref={notificationsRef} className="notification-panel" aria-label="Notifications" aria-live="polite">
-      <header><strong>Notifications</strong><button onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></header>
-      <Link href="/activities/demo-run"><span className="avatar small">S</span><span><strong>Sienna sent a high-five</strong><small>On your morning walk · 4m</small></span></Link>
-      <Link href="/messages"><span className="avatar small">M</span><span><strong>Marcus sent a message</strong><small>“See you at the trailhead” · 12m</small></span></Link>
-      <Link href="/explore"><span className="avatar small">T</span><span><strong>Trail Cleanup starts soon</strong><small>0.8 km away · 25m</small></span></Link>
+      <header><span><strong>Notifications</strong>{mode !== 'CONNECTED' && <small>Preview</small>}</span><button onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></header>
+      {mode === 'CONNECTED' ? <div className="notification-empty"><UiIcon name="bell" /><strong>You’re all caught up</strong><p>New high-fives, follows, and session updates will appear here.</p></div> : <>
+        <Link href="/activities/demo-run"><span className="avatar small">S</span><span><strong>Sienna sent a high-five</strong><small>On your morning walk · 4m</small></span></Link>
+        <Link href="/messages"><span className="avatar small">E</span><span><strong>Elena sent a message</strong><small>“See you at the trailhead” · 12m</small></span></Link>
+        <Link href="/explore"><span className="avatar small">T</span><span><strong>Trail Cleanup starts soon</strong><small>0.8 km away · 25m</small></span></Link>
+      </>}
     </aside>}
 
     {menuOpen && <div className="mobile-drawer-layer" role="presentation" onClick={() => setMenuOpen(false)}>
       <aside className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Expanded navigation" onClick={event => event.stopPropagation()}>
         <header><Link href="/" className="mobile-wordmark">Flinkout</Link><button onClick={() => setMenuOpen(false)} aria-label="Close navigation">×</button></header>
-        <Link href="/profile" className="drawer-profile"><span className="avatar">M</span><span><strong>Marcus Rivera</strong><small>@marcus_moves</small></span></Link>
+        <Link href="/profile" className="drawer-profile"><span className="avatar">{viewerInitial}</span><span><strong>{viewerName}</strong><small>@{viewer.username}</small></span></Link>
+        {mode !== 'CONNECTED' && <p className="drawer-preview-note">Preview workspace · actions stay on this device</p>}
         <p className="drawer-section-label">More from Flinkout</p>
         {mobileDrawerNavigation.map(item => <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
       </aside>
@@ -127,8 +133,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     <nav className="nav" aria-label="Primary navigation">
       <Link href="/profile" className="nav-profile" aria-label="Open my profile">
-        <span className="avatar nav-avatar">M</span>
-        <strong>Marcus Rivera</strong><small>@marcus_moves</small>
+        <span className="avatar nav-avatar">{viewerInitial}</span>
+        <strong>{viewerName}</strong><small>@{viewer.username}</small>
       </Link>
       <div className="desktop-nav-links">
         {desktopNavigation.map(item => <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
@@ -139,7 +145,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {mobileNavigation.map(item => <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
       </div>
     </nav>
-    {!path.startsWith('/record') && <Link href="/record" className="mobile-start-fab"><UiIcon name="activity" /><span>Start</span></Link>}
+    {mode !== 'CONNECTED' && <div className={`connection-banner ${mode === 'CHECKING' ? 'checking' : ''}`} role="status">
+      <span className="connection-dot" />
+      <span><strong>{mode === 'CHECKING' ? 'Checking your connection' : 'Preview workspace'}</strong><small>{mode === 'CHECKING' ? 'Loading your account…' : 'Social updates are saved on this device until you sign in.'}</small></span>
+      {mode === 'PREVIEW' && <Link href="/login">Sign in</Link>}
+    </div>}
+    <Link href="/record" className="mobile-start-fab" aria-current={path.startsWith('/record') ? 'page' : undefined}><UiIcon name="activity" /><span>Start</span></Link>
     <main className="main">{children}</main>
   </div>;
 }

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type Comment, type SocialActivity } from '../lib/api';
 import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
 import { getDemoActivity } from '../lib/demo-data';
-import { useInteractions, usePreviewState } from './interaction-provider';
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
 const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map detail-map map-loading">Loading route...</div> });
@@ -27,9 +27,12 @@ export function ActivityDetail({ id }: { id: string }) {
   const [sending, setSending] = useState(false);
   const [helpful, setHelpful] = useState<string[]>([]);
   const { notify, share } = useInteractions();
-  const { state, toggleReaction, addComment, deleteComment } = usePreviewState();
+  const { viewer } = useAppSession();
+  const { state, hydrated, toggleReaction, addComment, deleteComment } = usePreviewState();
   const isDemo = id.startsWith('demo-');
-  const reacted = isDemo ? state.reactedActivityIds.includes(id) : activity?.reactedByViewer ?? false;
+  const postedActivity = state.postedActivities.find(item => item.id === id);
+  const isPreview = isDemo || Boolean(postedActivity);
+  const reacted = isPreview ? state.reactedActivityIds.includes(id) : activity?.reactedByViewer ?? false;
   const previewComments = state.comments[id] ?? [];
 
   useEffect(() => {
@@ -38,24 +41,31 @@ export function ActivityDetail({ id }: { id: string }) {
       setComments(baseComments);
       return;
     }
+    if (postedActivity) {
+      setActivity(postedActivity);
+      setComments([]);
+      setError('');
+      return;
+    }
+    if (!hydrated) return;
     Promise.all([api<{ activity: SocialActivity }>(`/activities/${id}`), api<{ comments: Comment[] }>(`/activities/${id}/comments`)])
       .then(([a, c]) => { setActivity(a.activity); setComments(c.comments); })
       .catch(cause => setError(cause instanceof Error ? cause.message : 'Could not load activity'));
-  }, [demo.activity, id, isDemo]);
+  }, [demo.activity, hydrated, id, isDemo, postedActivity]);
 
   const allComments = useMemo(() => [
-    ...previewComments.map(comment => ({ id: comment.id, body: comment.body, createdAt: comment.createdAt, userId: 'demo-marcus', isOwner: true, user: { id: 'demo-marcus', username: 'marcus_moves', profile: { displayName: 'Marcus Rivera', photoUrl: null } } } satisfies Comment)),
+    ...previewComments.map(comment => ({ id: comment.id, body: comment.body, createdAt: comment.createdAt, userId: viewer.id, isOwner: true, user: { id: viewer.id, username: viewer.username, profile: { displayName: viewer.profile?.displayName ?? viewer.username, photoUrl: viewer.profile?.photoUrl ?? null } } } satisfies Comment)),
     ...comments,
-  ], [comments, previewComments]);
+  ], [comments, previewComments, viewer]);
 
   async function addActivityComment(event: React.FormEvent) {
     event.preventDefault();
     const nextBody = body.trim();
     if (!nextBody) return;
-    if (isDemo) {
+    if (isPreview) {
       addComment(id, nextBody);
       setBody('');
-      notify('Comment added and saved in this preview.');
+      notify('Comment added.');
       return;
     }
     setSending(true);
@@ -71,7 +81,7 @@ export function ActivityDetail({ id }: { id: string }) {
   }
 
   async function removeActivityComment(comment: Comment) {
-    if (isDemo && previewComments.some(item => item.id === comment.id)) {
+    if (isPreview && previewComments.some(item => item.id === comment.id)) {
       deleteComment(id, comment.id);
       notify('Comment deleted.');
       return;
@@ -87,7 +97,7 @@ export function ActivityDetail({ id }: { id: string }) {
 
   async function highFive() {
     if (!activity) return;
-    if (isDemo) {
+    if (isPreview) {
       toggleReaction(id);
       notify(reacted ? 'High-five removed.' : 'High-five sent!');
       return;
@@ -109,22 +119,24 @@ export function ActivityDetail({ id }: { id: string }) {
 
   const metadata = isDemo ? demo : {
     title: `${labelFor(activity.type)} activity`,
-    location: 'Shared route',
-    description: 'A shared Flinkout activity.',
+    location: activity.route?.length ? 'Recorded route' : 'Route not recorded',
+    description: activity.visibility === 'PRIVATE'
+      ? 'A private activity visible only to its owner.'
+      : activity.route?.length ? 'A completed Flinkout activity with a recorded route.' : 'A completed Flinkout activity without a GPS route.',
     tags: [labelFor(activity.type)],
     elevationM: 0,
   };
-  const displayReactionCount = activity.reactionCount + (isDemo ? Number(reacted) - Number(activity.reactedByViewer) : 0);
+  const displayReactionCount = activity.reactionCount + (isPreview ? Number(reacted) - Number(activity.reactedByViewer) : 0);
   const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h` : formatPace(activity.distanceM, activity.durationS);
 
   return <section className="session-detail-page">
     <header className="standalone-mobile-header"><button onClick={() => router.back()} aria-label="Back">Back</button><strong>Activity</strong><button aria-label="Share activity" onClick={() => void share({ title: `${metadata.title} on Flinkout`, text: metadata.description })}><UiIcon name="share" /></button></header>
-    <div className="session-map-hero"><RouteMap points={activity.route ?? []} /><div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
+    <div className="session-map-hero">{activity.route?.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state detail-route-empty"><UiIcon name="map" size={32} /><strong>No route was recorded</strong><span>This activity includes time and movement metrics only.</span></div>}<div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
     <div className="session-detail-grid">
       <main>
         <section className="session-title-card"><div className="avatar small">{activity.user.profile?.displayName?.[0] ?? activity.user.username[0]}</div><div><h1>{metadata.title}</h1><p>by <Link href={`/u/${activity.user.username}`}>{activity.user.profile?.displayName ?? activity.user.username}</Link> - {metadata.location}</p></div><span>#{metadata.tags[0]}</span></section>
         <p className="activity-detail-description">{metadata.description}</p>
-        <button className={`high-five-button ${reacted ? 'active' : ''}`} aria-pressed={reacted} onClick={() => void highFive()}>{reacted ? 'High-Five Sent' : 'Send High-Five'} <b>{displayReactionCount}</b></button>
+        <button className={`high-five-button ${reacted ? 'active' : ''}`} aria-pressed={reacted} onClick={() => void highFive()}><UiIcon name="highfive" /> {reacted ? 'High-Five Sent' : 'Send High-Five'} <b>{displayReactionCount}</b></button>
         <section className="session-timeline"><h2>Activity timeline</h2><div><i className="mint"><UiIcon name="play" size={16}/></i><span><strong>Activity started</strong><small>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</small></span></div><div><i className="blue"><UiIcon name="activity" size={16}/></i><span><strong>{formatDistance(activity.distanceM)} completed</strong><small>{labelFor(activity.type)} at {speedMetric}</small></span></div><div><i className="green"><UiIcon name="stop" size={16}/></i><span><strong>Activity completed</strong><small>{formatDuration(activity.durationS)} moving time</small></span></div></section>
       </main>
       <aside id="comments" className="community-notes">
