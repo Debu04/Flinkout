@@ -32,7 +32,7 @@ export function StartingSoonMobile() {
         const joined = state.joinedSessionIds.includes(session.id);
         return <article className="session-teaser" key={session.id}>
           <Link href={`/activities/${session.activityId}`} className={`session-photo ${session.tone}`}><span>{session.starts}</span></Link>
-          <div><h3>{session.name}</h3><small>{session.distance}</small><footer><span className="teaser-faces">{session.faces}</span><button className={joined ? 'joined' : ''} onClick={() => join(session.id, session.name)}>{joined ? 'Joined' : 'Join now'}</button></footer></div>
+          <div><h3>{session.name}</h3><small>{session.distance}</small><footer><span className="teaser-faces">{session.faces}</span><button className={joined ? 'joined' : ''} aria-pressed={joined} onClick={() => join(session.id, session.name)}>{joined ? 'Joined' : 'Join now'}</button></footer></div>
         </article>;
       })}
     </div>

@@ -21,7 +21,7 @@ export default function ClubsPage() {
     <header className="clubs-hero"><span>MOVE WITH YOUR PEOPLE</span><h1>Clubs</h1><p>Find recurring groups, local sessions, and new movement buddies.</p></header>
     <div className="club-grid">{clubs.map(club => <article className="club-card" key={club.id}>
       <div className={`club-cover ${club.tone}`}><span>{club.name.split(' ').map(word => word[0]).join('').slice(0, 2)}</span></div>
-      <div><small>{club.members + (state.joinedClubIds.includes(club.id) ? 1 : 0)} members</small><h2>{club.name}</h2><p>{club.description}</p><footer><Link href={`/explore?q=${encodeURIComponent(club.name)}`}>View sessions</Link><button className={state.joinedClubIds.includes(club.id) ? 'joined' : ''} aria-label={`${state.joinedClubIds.includes(club.id) ? 'Leave' : 'Join'} ${club.name}`} onClick={() => toggle(club.id, club.name)}>{state.joinedClubIds.includes(club.id) ? 'Joined' : 'Join club'}</button></footer></div>
+      <div><small>{club.members + (state.joinedClubIds.includes(club.id) ? 1 : 0)} members</small><h2>{club.name}</h2><p>{club.description}</p><footer><Link href={`/explore?q=${encodeURIComponent(club.name)}`}>View sessions</Link><button className={state.joinedClubIds.includes(club.id) ? 'joined' : ''} aria-label={`${state.joinedClubIds.includes(club.id) ? 'Leave' : 'Join'} ${club.name}`} aria-pressed={state.joinedClubIds.includes(club.id)} onClick={() => toggle(club.id, club.name)}>{state.joinedClubIds.includes(club.id) ? 'Joined' : 'Join club'}</button></footer></div>
     </article>)}</div>
   </section>;
 }

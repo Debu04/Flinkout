@@ -82,7 +82,7 @@ export function MessagesClient() {
       </button>
       <h2 className="messages-label">{tab === 'CHATS' ? 'Recent Messages' : 'Your Groups'}</h2>
       <div id="conversation-list" role="tabpanel" aria-labelledby={tab === 'CHATS' ? 'chats-tab' : 'groups-tab'} className="message-list">
-        {visible.map(chat => <button className={`message-row ${selected?.id === chat.id ? 'selected' : ''}`} key={chat.id} onClick={() => choose(chat)}>
+        {visible.map(chat => <button className={`message-row ${selected?.id === chat.id ? 'selected' : ''}`} aria-pressed={selected?.id === chat.id} key={chat.id} onClick={() => choose(chat)}>
           <span className={`avatar message-avatar ${chat.online ? 'online' : ''}`}>{chat.initial}</span>
           <span><strong>{chat.name}</strong><small>{(state.messages[chat.id]?.at(-1)?.body) ?? chat.preview}</small></span>
           <time>{state.messages[chat.id]?.length ? 'Now' : chat.time}</time>{chat.online && <i />}

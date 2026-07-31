@@ -50,7 +50,7 @@ function StartingSoon() {
       const joined = state.joinedSessionIds.includes(session.id);
       return <article className="event-card" key={session.id}>
         <Link href={`/activities/${session.activityId}`}><span className={`event-time ${index ? 'orange' : ''}`}><strong>{session.minutes}</strong><small>MIN</small></span><span><strong>{session.name}</strong><small>{session.location}</small><p><span className="mini-faces">{session.faces}</span> +{session.count} joining</p></span></Link>
-        <button className={joined ? 'joined' : ''} onClick={() => join(session.id, session.name)}>{joined ? 'Joined' : 'Join'}</button>
+        <button className={joined ? 'joined' : ''} aria-pressed={joined} onClick={() => join(session.id, session.name)}>{joined ? 'Joined' : 'Join'}</button>
       </article>;
     })}
     <Link className="panel-button" href="/explore">View all events</Link>
@@ -69,7 +69,7 @@ function BuddyDiscovery() {
     <header><h2>Buddy Discovery</h2><Link href="/explore">See all</Link></header>
     {people.map(person => {
       const following = state.followingUsernames.includes(person.username);
-      return <div className="buddy" key={person.username}><Link href={`/u/${person.username}`} className="avatar small">{person.initial}</Link><span className="grow"><strong>{person.name}</strong><small>{person.detail}</small></span><button className={following ? 'following' : ''} aria-label={`${following ? 'Unfollow' : 'Follow'} ${person.name}`} onClick={() => {
+      return <div className="buddy" key={person.username}><Link href={`/u/${person.username}`} className="avatar small">{person.initial}</Link><span className="grow"><strong>{person.name}</strong><small>{person.detail}</small></span><button className={following ? 'following' : ''} aria-label={`${following ? 'Unfollow' : 'Follow'} ${person.name}`} aria-pressed={following} onClick={() => {
         toggleFollow(person.username);
         notify(following ? `You unfollowed ${person.name}.` : `You are now following ${person.name}.`);
       }}>{following ? 'Following' : 'Follow'}</button></div>;
@@ -87,10 +87,27 @@ function LocalHeatmap() {
 
 export default function Home() {
   const { notify } = useInteractions();
-  const { mode } = useAppSession();
+  const { mode, viewer } = useAppSession();
+  const firstName = (viewer.profile?.displayName ?? viewer.username).split(' ')[0];
   return <section className="trail-home">
     <div className="trail-feed-column">
+      <section className="social-home-intro">
+        <div>
+          <span className="eyebrow">YOUR MOVEMENT COMMUNITY</span>
+          <h1>Move with your people, {firstName}.</h1>
+          <p>See what is happening nearby, celebrate a friend, or start something of your own.</p>
+        </div>
+        <Link className="home-start-card" href="/record">
+          <span><UiIcon name="play" /></span>
+          <span><strong>Start an activity</strong><small>GPS-ready · saves offline</small></span>
+          <b>Start</b>
+        </Link>
+      </section>
       <LiveNearby />
+      <div className="feed-section-heading">
+        <span><small>COMMUNITY FEED</small><strong>Latest movement</strong></span>
+        <span className="feed-live-status"><i /> Updated now</span>
+      </div>
       <SocialFeed />
     </div>
     <aside className="trail-aside">

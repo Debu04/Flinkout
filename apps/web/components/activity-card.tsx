@@ -155,9 +155,17 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
       <span><UiIcon name={activity.syncStatus === 'FAILED' ? 'radio' : 'bookmark'} size={17} /><strong>{mode === 'PREVIEW' ? 'Device-only preview · not published' : activity.syncStatus === 'FAILED' ? 'Saved locally · publishing failed' : activity.syncStatus === 'SYNCING' ? 'Publishing activity…' : 'Saved locally · waiting to publish'}</strong></span>
       {activity.syncStatus === 'FAILED' && <button onClick={() => void retryPublish()}>Retry</button>}
     </div>}
+    <div className="activity-social-proof" aria-live="polite">
+      <span>{reactionCount ? `${reactionCount} ${reactionCount === 1 ? 'high-five' : 'high-fives'}` : 'Be the first to high-five'}</span>
+      <span>{activity.commentCount ? `${activity.commentCount} ${activity.commentCount === 1 ? 'trail note' : 'trail notes'}` : 'No trail notes yet'}</span>
+    </div>
     <footer className="activity-actions">
-      <div><button className={reacted ? 'reacted reaction-pop' : ''} onClick={toggleReaction} aria-label={reacted ? 'Remove high-five' : 'Send high-five'} aria-pressed={reacted}><UiIcon name="highfive" /> {reactionCount}</button><Link href={`/activities/${activity.id}#comments`}><UiIcon name="chat" /> {activity.commentCount}</Link><button aria-label="Share activity" onClick={() => void share({ title: `${content.location} on Flinkout`, text: content.description, url: `${window.location.origin}/activities/${activity.id}` })}><UiIcon name="share" /></button></div>
-      <button className={saved ? 'saved' : ''} onClick={() => { toggleSaved(activity.id); notify(saved ? 'Removed from saved activities.' : 'Activity saved for later.'); }} aria-label={saved ? 'Remove bookmark' : 'Bookmark activity'} aria-pressed={saved}><UiIcon name="bookmark" /></button>
+      <div>
+        <button className={reacted ? 'reacted reaction-pop' : ''} onClick={toggleReaction} aria-label={reacted ? 'Remove high-five' : 'Send high-five'} aria-pressed={reacted}><UiIcon name="highfive" /><span>{reacted ? 'High-fived' : 'High-five'}</span></button>
+        <Link href={`/activities/${activity.id}#comments`}><UiIcon name="chat" /><span>Comment</span></Link>
+        <button aria-label="Share activity" onClick={() => void share({ title: `${content.location} on Flinkout`, text: content.description, url: `${window.location.origin}/activities/${activity.id}` })}><UiIcon name="share" /><span>Share</span></button>
+      </div>
+      <button className={saved ? 'saved' : ''} onClick={() => { toggleSaved(activity.id); notify(saved ? 'Removed from saved activities.' : 'Activity saved for later.'); }} aria-label={saved ? 'Remove bookmark' : 'Bookmark activity'} aria-pressed={saved}><UiIcon name="bookmark" /><span>{saved ? 'Saved' : 'Save'}</span></button>
     </footer>
     {error && <p className="error card-error" role="alert">{error}</p>}
   </article>;

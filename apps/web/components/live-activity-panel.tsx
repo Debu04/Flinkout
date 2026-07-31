@@ -37,6 +37,6 @@ export function LiveActivityPanel() {
 
   return <section className="live-panel card stack">
     <div className="row"><div className="live-dot"/><div className="grow"><h2>Live near you</h2><p className="hint">{notice}</p></div><span className="live-label">LIVE</span></div>
-    {items.map(item => <article className="live-card" key={item.id}><div className="avatar small">{item.user.displayName[0]}</div><div className="grow"><strong>{item.user.displayName}</strong><small>{labelFor(item.type)} · {formatDistance(item.distanceM)} · {formatDuration(item.durationS)}</small><small>Approx. {item.distanceKm.toFixed(1)} km away · {item.joinCount} connected</small></div><button className="button secondary" onClick={() => void join(item)} disabled={joining === item.id}>{joining === item.id ? 'Updating…' : joined.includes(item.id) ? 'Joined' : 'Join'}</button></article>)}
+    {items.map(item => <article className="live-card" key={item.id}><div className="avatar small">{item.user.displayName[0]}</div><div className="grow"><strong>{item.user.displayName}</strong><small>{labelFor(item.type)} · {formatDistance(item.distanceM)} · {formatDuration(item.durationS)}</small><small>Approx. {item.distanceKm.toFixed(1)} km away · {item.joinCount} connected</small></div><button className="button secondary" aria-pressed={joined.includes(item.id)} onClick={() => void join(item)} disabled={joining === item.id}>{joining === item.id ? 'Updating…' : joined.includes(item.id) ? 'Joined' : 'Join'}</button></article>)}
   </section>;
 }
