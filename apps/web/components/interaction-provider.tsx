@@ -9,7 +9,7 @@ type InteractionContextValue = {
   share: (input: ShareInput) => Promise<void>;
 };
 
-export type PreviewMessage = { id: string; body: string; createdAt: string };
+export type PreviewMessage = { id: string; body: string; createdAt: string; status?: 'SENDING' | 'DELIVERED' };
 export type PreviewComment = { id: string; body: string; createdAt: string };
 type PreviewState = {
   reactedActivityIds: string[];
@@ -34,7 +34,8 @@ type PreviewContextValue = {
   toggleSession: (id: string) => void;
   toggleClub: (id: string) => void;
   markNotificationsRead: () => void;
-  addMessage: (conversationId: string, body: string) => void;
+  addMessage: (conversationId: string, body: string) => string;
+  markMessageDelivered: (conversationId: string, messageId: string) => void;
   addComment: (activityId: string, body: string) => void;
   deleteComment: (activityId: string, commentId: string) => void;
   setRecentSearches: (items: string[]) => void;
@@ -160,11 +161,22 @@ export function InteractionProvider({ children }: { children: React.ReactNode })
     toggleSession: id => toggleListValue('joinedSessionIds', id),
     toggleClub: id => toggleListValue('joinedClubIds', id),
     markNotificationsRead: () => updatePreview(current => ({ ...current, notificationsRead: true })),
-    addMessage: (conversationId, body) => updatePreview(current => ({
+    addMessage: (conversationId, body) => {
+      const id = crypto.randomUUID();
+      updatePreview(current => ({
+        ...current,
+        messages: {
+          ...current.messages,
+          [conversationId]: [...(current.messages[conversationId] ?? []), { id, body, createdAt: new Date().toISOString(), status: 'SENDING' }],
+        },
+      }));
+      return id;
+    },
+    markMessageDelivered: (conversationId, messageId) => updatePreview(current => ({
       ...current,
       messages: {
         ...current.messages,
-        [conversationId]: [...(current.messages[conversationId] ?? []), { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() }],
+        [conversationId]: (current.messages[conversationId] ?? []).map(message => message.id === messageId ? { ...message, status: 'DELIVERED' } : message),
       },
     })),
     addComment: (activityId, body) => updatePreview(current => ({

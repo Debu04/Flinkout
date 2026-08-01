@@ -1,6 +1,6 @@
 type IconName =
   | 'activity' | 'bell' | 'bike' | 'bookmark' | 'chat' | 'compass' | 'group'
-  | 'eye' | 'eyeOff' | 'hike'
+  | 'eye' | 'eyeOff' | 'hike' | 'edit' | 'back' | 'close' | 'send'
   | 'heart' | 'highfive' | 'home' | 'location' | 'lock' | 'map' | 'more' | 'pause' | 'play'
   | 'profile' | 'radio' | 'run' | 'search' | 'settings' | 'share' | 'shield' | 'stop' | 'walk';
 
@@ -11,6 +11,9 @@ const paths: Record<IconName, React.ReactNode> = {
   bookmark: <path d="M6 3h12v18l-6-4-6 4z" />,
   chat: <path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z" />,
   compass: <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5z" /></>,
+  back: <><path d="m15 18-6-6 6-6" /><path d="M9 12h11" /></>,
+  close: <><path d="m6 6 12 12" /><path d="M18 6 6 18" /></>,
+  edit: <><path d="M12 20H5a1 1 0 0 1-1-1v-7" /><path d="m16.5 3.5 4 4L11 17l-5 1 1-5z" /></>,
   eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></>,
   eyeOff: <><path d="m3 3 18 18" /><path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-2.4 3.1M6.2 6.2C3.9 7.8 2.5 12 2.5 12s3.5 6 9.5 6c1.4 0 2.7-.3 3.8-.8" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
   group: <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2" /><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6" /><path d="M15 15c3 0 5 1.5 5 4" /></>,
@@ -29,6 +32,7 @@ const paths: Record<IconName, React.ReactNode> = {
   run: <><circle cx="15" cy="4" r="1.8" /><path d="m12.5 8-3 4 4 2 2.5-4 3 2M9.5 12 5 11M13.5 14l-3.5 6M16 10l-4-1M16 14l4 5" /><path d="M3 16h4M2 20h5" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1-2.8 2.8-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1 1.6v.2h-4V21a1.8 1.8 0 0 0-1-1.6 1.8 1.8 0 0 0-2 .4l-.1.1-2.8-2.8.1-.1a1.8 1.8 0 0 0 .4-2A1.8 1.8 0 0 0 3 14H3v-4h.2a1.8 1.8 0 0 0 1.6-1 1.8 1.8 0 0 0-.4-2l-.1-.1 2.8-2.8.1.1a1.8 1.8 0 0 0 2 .4A1.8 1.8 0 0 0 10 3V3h4v.2a1.8 1.8 0 0 0 1 1.6 1.8 1.8 0 0 0 2-.4l.1-.1 2.8 2.8-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.6 1h.2v4H21a1.8 1.8 0 0 0-1.6 1Z" /></>,
+  send: <><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></>,
   share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" /></>,
   shield: <><path d="M12 2 20 5v6c0 5-3.4 8.6-8 11-4.6-2.4-8-6-8-11V5z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></>,
   stop: <rect x="6" y="6" width="12" height="12" rx="1" />,

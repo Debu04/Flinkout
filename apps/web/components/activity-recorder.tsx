@@ -28,12 +28,36 @@ export function ActivityRecorder() {
   const [posting, setPosting] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [storageState, setStorageState] = useState<'CHECKING' | 'READY' | 'ERROR'>('CHECKING');
+  const [startPending, setStartPending] = useState(false);
+  const [startError, setStartError] = useState('');
   const [shortActivityWarning, setShortActivityWarning] = useState(false);
   const { notify } = useInteractions();
   const { postActivity } = usePreviewState();
   const { viewer, mode } = useAppSession();
   const watchId = useRef<number | undefined>(undefined);
   const activityRef = useRef<LocalActivity | undefined>(undefined);
+
+  const checkStorage = useCallback(async () => {
+    setRestoring(true);
+    setStorageState('CHECKING');
+    setStartError('');
+    try {
+      const found = await getIncompleteActivity();
+      setStorageState('READY');
+      if (found) {
+        setActivity(found);
+        setSelected(found.type);
+        setScreen(found.status === 'FINISHED' ? 'SUMMARY' : 'LIVE');
+        setGps(found.status === 'PAUSED' ? 'Recording restored and paused.' : 'Recording restored. Reconnecting to GPS…');
+      }
+    } catch {
+      setStorageState('ERROR');
+      setStartError('Flinkout could not open its offline activity storage. Retry the device check before starting.');
+      setGps('Local storage is unavailable. Recording cannot start safely.');
+    } finally {
+      setRestoring(false);
+    }
+  }, []);
 
   useEffect(() => {
     activityRef.current = activity;
@@ -47,24 +71,13 @@ export function ActivityRecorder() {
     setOnline(navigator.onLine);
     addEventListener('online', update);
     addEventListener('offline', update);
-    getIncompleteActivity().then(found => {
-      setStorageState('READY');
-      if (found) {
-        setActivity(found);
-        setSelected(found.type);
-        setScreen(found.status === 'FINISHED' ? 'SUMMARY' : 'LIVE');
-        setGps(found.status === 'PAUSED' ? 'Recording restored and paused.' : 'Recording restored. Reconnecting to GPS...');
-      }
-    }).catch(() => {
-      setStorageState('ERROR');
-      setGps('Local storage is unavailable. Recording cannot start safely.');
-    }).finally(() => setRestoring(false));
+    void checkStorage();
     return () => {
       removeEventListener('online', update);
       removeEventListener('offline', update);
       if (watchId.current !== undefined) navigator.geolocation?.clearWatch(watchId.current);
     };
-  }, []);
+  }, [checkStorage]);
 
   useEffect(() => {
     if (mode !== 'CONNECTED' || !navigator.onLine) return;
@@ -208,11 +221,13 @@ export function ActivityRecorder() {
     return () => clearInterval(retry);
   }, [mode, viewer.id]);
 
-  function start() {
-    if (restoring || storageState !== 'READY') return;
+  async function start() {
+    if (restoring || startPending || storageState !== 'READY') return;
+    setStartPending(true);
+    setStartError('');
     const time = now();
     const created: LocalActivity = {
-      clientId: crypto.randomUUID(),
+      clientId: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       ownerId: viewer.id,
       type: selected,
       visibility: 'FOLLOWERS',
@@ -231,9 +246,20 @@ export function ActivityRecorder() {
       createdAt: time,
       updatedAt: time,
     };
-    persist(created);
-    beginWatch();
-    setScreen('LIVE');
+    try {
+      await putActivity(created);
+      activityRef.current = created;
+      setActivity(created);
+      setStorageState('READY');
+      setScreen('LIVE');
+    } catch {
+      activityRef.current = undefined;
+      setActivity(undefined);
+      setStorageState('ERROR');
+      setStartError('The activity was not started because it could not be saved safely. Retry the device check and try again.');
+    } finally {
+      setStartPending(false);
+    }
   }
 
   function pauseResume() {
@@ -355,9 +381,10 @@ export function ActivityRecorder() {
     <section className="movement-picker card">
       <header><p className="eyebrow">NEW ACTIVITY</p><h1>What are you doing?</h1><p>Choose a movement. Recording stays on this device even if your connection drops.</p></header>
       <div className="movement-types">{ACTIVITY_TYPES.map(type => <button className={type === selected ? 'selected' : ''} onClick={() => setSelected(type)} key={type} aria-pressed={type === selected}><span><UiIcon name={{ WALK: 'walk', RUN: 'run', RIDE: 'bike', HIKE: 'hike' }[type] as 'walk' | 'run' | 'bike' | 'hike'} size={30} /></span><strong>{labelFor(type)}</strong></button>)}</div>
-      <section className={`daily-goal recording-readiness ${storageState.toLowerCase()}`} aria-live="polite"><div><span>Recording mode</span><p><strong>GPS + offline backup</strong></p></div><b>{restoring ? 'Checking device…' : storageState === 'READY' ? 'Ready to record' : 'Storage unavailable'}</b><i><span /></i></section>
+      <section className={`daily-goal recording-readiness ${storageState.toLowerCase()}`} aria-live="polite"><div><span>Recording mode</span><p><strong>GPS + offline backup</strong></p></div><b>{startPending ? 'Saving activity…' : restoring ? 'Checking device…' : storageState === 'READY' ? 'Ready to record' : 'Storage unavailable'}</b><i><span /></i></section>
+      {startError && <p className="recording-start-error" role="alert"><UiIcon name="shield" size={18} />{startError}</p>}
       <p className="recording-privacy-note"><UiIcon name="shield" size={18} /> Live sharing becomes available after you start and GPS finds your location.</p>
-      <button className="start-movement-button" onClick={start} disabled={restoring || storageState !== 'READY'}><UiIcon name="play" />{restoring ? 'Checking device…' : `Start ${labelFor(selected).toLowerCase()}`} <span>Go</span></button>
+      <button className="start-movement-button" onClick={() => void (storageState === 'ERROR' ? checkStorage() : start())} disabled={restoring || startPending}><UiIcon name={storageState === 'ERROR' ? 'shield' : 'play'} />{startPending ? 'Starting safely…' : restoring ? 'Checking device…' : storageState === 'ERROR' ? 'Retry device check' : `Start ${labelFor(selected).toLowerCase()}`} <span>{storageState === 'ERROR' ? 'Retry' : 'Go'}</span></button>
     </section>
   </section>;
 

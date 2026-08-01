@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAppSession, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
 type Conversation = {
@@ -30,7 +30,7 @@ const groups: Conversation[] = [
 const liveConversation: Conversation = {
   id: 'live-walk',
   name: 'Morning Harbor Loop',
-  preview: 'Just passing the 2 km mark...',
+  preview: 'Just passing the 2 km mark…',
   time: 'Now',
   initial: 'MH',
   group: true,
@@ -38,68 +38,110 @@ const liveConversation: Conversation = {
   baseMessages: [{ direction: 'incoming', body: 'Just passing the 2 km mark. The group is staying together.' }],
 };
 
-export function MessagesClient() {
+function MessengerExperience({ variant, onClose }: { variant: 'page' | 'popup'; onClose?: () => void }) {
   const [tab, setTab] = useState<'CHATS' | 'GROUPS'>('CHATS');
   const [selectedId, setSelectedId] = useState('');
   const [draft, setDraft] = useState('');
-  const { state, addMessage } = usePreviewState();
+  const [search, setSearch] = useState('');
+  const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const { state, addMessage, markMessageDelivered } = usePreviewState();
   const { mode } = useAppSession();
-  const { notify } = useInteractions();
-  const visible = tab === 'CHATS' ? chats : groups;
   const allConversations = useMemo(() => [liveConversation, ...chats, ...groups], []);
   const selected = selectedId ? allConversations.find(item => item.id === selectedId) ?? null : null;
+  const source = tab === 'CHATS' ? chats : groups;
+  const visible = source.filter(item => item.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const messageCount = selected ? (state.messages[selected.id]?.length ?? 0) : 0;
 
   useEffect(() => {
-    if (window.matchMedia('(min-width: 900px)').matches) setSelectedId('sienna');
-  }, []);
+    if (variant === 'page' && window.matchMedia('(min-width: 900px)').matches) setSelectedId('sienna');
+  }, [variant]);
+
+  useEffect(() => {
+    if (!selected) return;
+    window.requestAnimationFrame(() => threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: messageCount ? 'smooth' : 'auto' }));
+  }, [messageCount, selected]);
 
   function send(event: React.FormEvent) {
     event.preventDefault();
     const body = draft.trim();
     if (!body || !selected) return;
-    addMessage(selected.id, body);
+    const messageId = addMessage(selected.id, body);
     setDraft('');
-    notify('Message saved in this device-only messaging preview.');
+    window.setTimeout(() => markMessageDelivered(selected.id, messageId), 650);
+    inputRef.current?.focus();
   }
 
   function choose(conversation: Conversation) {
     setSelectedId(conversation.id);
     setDraft('');
-    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
+    window.requestAnimationFrame(() => inputRef.current?.focus());
   }
 
-  return <section className={`messages-page messaging-layout ${selected ? 'has-conversation' : ''}`}>
-    <div className="messages-product-note" role="status"><UiIcon name="chat" size={18} /><span><strong>Messaging preview</strong><small>{mode === 'CONNECTED' ? 'These sample conversations do not send messages to other accounts yet.' : 'Sample chats and your replies are stored only on this device.'}</small></span></div>
+  function changeTab(next: 'CHATS' | 'GROUPS') {
+    setTab(next);
+    setSelectedId('');
+    setSearch('');
+  }
+
+  function compose() {
+    setTab('CHATS');
+    setSelectedId('');
+    setSearch('');
+    window.requestAnimationFrame(() => searchRef.current?.focus());
+  }
+
+  return <section className={`messages-page messaging-layout ${variant === 'page' ? 'messenger-page' : 'messenger-popup-surface'} ${selected ? 'has-conversation' : ''}`}>
+    {variant === 'popup' && <header className="messenger-window-header">
+      <div><span className="messenger-logo"><UiIcon name="chat" size={20} /></span><span><strong>Messages</strong><small>{mode === 'CONNECTED' ? 'Flinkout Messenger' : 'Device preview'}</small></span></div>
+      <button onClick={onClose} aria-label="Close messages"><UiIcon name="close" size={20} /></button>
+    </header>}
+
+    {variant === 'page' && <div className="messages-product-note" role="status"><UiIcon name="chat" size={18} /><span><strong>Messaging preview</strong><small>{mode === 'CONNECTED' ? 'These sample conversations do not send messages to other accounts yet.' : 'Sample chats and your replies are stored only on this device.'}</small></span></div>}
+
     <aside className="conversations-pane" aria-label="Conversations">
+      <div className="messenger-list-heading"><div><strong>Chats</strong><span>{tab === 'CHATS' ? chats.length : groups.length}</span></div><button onClick={compose} aria-label="Compose a new message"><UiIcon name="edit" size={18} /></button></div>
+      <label className="messenger-search"><UiIcon name="search" size={17} /><span className="sr-only">Search messages</span><input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search messages" /></label>
       <div className="messages-tabs" role="tablist" aria-label="Message categories">
-        <button id="chats-tab" role="tab" aria-controls="conversation-list" aria-selected={tab === 'CHATS'} onClick={() => setTab('CHATS')}>Chats</button>
-        <button id="groups-tab" role="tab" aria-controls="conversation-list" aria-selected={tab === 'GROUPS'} onClick={() => setTab('GROUPS')}>Groups</button>
+        <button id={`${variant}-chats-tab`} role="tab" aria-controls={`${variant}-conversation-list`} aria-selected={tab === 'CHATS'} onClick={() => changeTab('CHATS')}>Chats</button>
+        <button id={`${variant}-groups-tab`} role="tab" aria-controls={`${variant}-conversation-list`} aria-selected={tab === 'GROUPS'} onClick={() => changeTab('GROUPS')}>Groups</button>
       </div>
       <button className="live-chat-card" onClick={() => choose(liveConversation)}>
         <div><span className="live-dot" /> LIVE WALK SESSION <b>Now</b></div>
-        <h1>Morning Harbor Loop<br />Chat</h1>
-        <p><span className="chat-faces">S E J</span><strong>+12</strong><span>Just passing the 2 km mark...</span></p>
+        <h1>Morning Harbor Loop <span>Chat</span></h1>
+        <p><span className="chat-faces">S E J</span><strong>+12</strong><span>Just passing the 2 km mark…</span></p>
       </button>
-      <h2 className="messages-label">{tab === 'CHATS' ? 'Recent Messages' : 'Your Groups'}</h2>
-      <div id="conversation-list" role="tabpanel" aria-labelledby={tab === 'CHATS' ? 'chats-tab' : 'groups-tab'} className="message-list">
+      <h2 className="messages-label">{tab === 'CHATS' ? 'Recent messages' : 'Your groups'}</h2>
+      <div id={`${variant}-conversation-list`} role="tabpanel" aria-labelledby={tab === 'CHATS' ? `${variant}-chats-tab` : `${variant}-groups-tab`} className="message-list">
         {visible.map(chat => <button className={`message-row ${selected?.id === chat.id ? 'selected' : ''}`} aria-pressed={selected?.id === chat.id} key={chat.id} onClick={() => choose(chat)}>
           <span className={`avatar message-avatar ${chat.online ? 'online' : ''}`}>{chat.initial}</span>
-          <span><strong>{chat.name}</strong><small>{(state.messages[chat.id]?.at(-1)?.body) ?? chat.preview}</small></span>
+          <span><strong>{chat.name}</strong><small>{state.messages[chat.id]?.at(-1)?.body ?? chat.preview}</small></span>
           <time>{state.messages[chat.id]?.length ? 'Now' : chat.time}</time>{chat.online && <i />}
         </button>)}
+        {!visible.length && <div className="message-list-empty"><UiIcon name="search" /><strong>No conversations found</strong><small>Try another name.</small></div>}
       </div>
     </aside>
 
     <section className="conversation-pane conversation-page" aria-label={selected ? `Conversation with ${selected.name}` : 'Select a conversation'}>
       {selected ? <>
-        <header className="conversation-header"><button className="mobile-conversation-back" onClick={() => setSelectedId('')} aria-label="Back to conversations">Back</button><span className="avatar small">{selected.initial}</span><span><strong>{selected.name}</strong><small>{selected.online ? 'Active now' : selected.group ? 'Group conversation' : 'Flinkout message'}</small></span></header>
-        <div className="conversation-thread" aria-live="polite">
+        <header className="conversation-header"><button className="mobile-conversation-back" onClick={() => setSelectedId('')} aria-label="Back to conversations"><UiIcon name="back" size={19} /></button><span className={`avatar small ${selected.online ? 'online' : ''}`}>{selected.initial}</span><span><strong>{selected.name}</strong><small>{selected.online ? 'Active now' : selected.group ? 'Group conversation' : 'Flinkout message'}</small></span></header>
+        <div className="conversation-thread" ref={threadRef} aria-live="polite">
           <time>Today</time>
           {selected.baseMessages.map((message, index) => <p className={`message-bubble ${message.direction}`} key={`${selected.id}-base-${index}`}>{message.body}</p>)}
-          {(state.messages[selected.id] ?? []).map(message => <p className="message-bubble outgoing" key={message.id}>{message.body}<small>Sent</small></p>)}
+          {(state.messages[selected.id] ?? []).map(message => <p className="message-bubble outgoing" key={message.id}>{message.body}<small>{message.status === 'SENDING' ? 'Sending…' : 'Delivered'} <span aria-hidden="true">✓</span></small></p>)}
         </div>
-        <form className="message-composer" onSubmit={send}><label className="sr-only" htmlFor="message-draft">Preview a message to {selected.name}</label><input id="message-draft" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a preview reply…" autoComplete="off" /><button disabled={!draft.trim()}>Save reply</button></form>
-      </> : <div className="empty-state"><h2>Select a conversation</h2><p>Your chats and group activity will appear here.</p></div>}
+        <form className="message-composer" onSubmit={send}><label className="sr-only" htmlFor={`${variant}-message-draft`}>Message {selected.name}</label><input ref={inputRef} id={`${variant}-message-draft`} value={draft} onChange={event => setDraft(event.target.value)} placeholder="Aa" autoComplete="off" enterKeyHint="send" /><button disabled={!draft.trim()} aria-label={`Send message to ${selected.name}`}><UiIcon name="send" size={19} /></button></form>
+      </> : <div className="empty-state"><span className="messenger-empty-icon"><UiIcon name="chat" size={28} /></span><h2>Your messages</h2><p>Select a chat or group to start talking.</p></div>}
     </section>
   </section>;
+}
+
+export function MessagesClient() {
+  return <MessengerExperience variant="page" />;
+}
+
+export function MessengerPopup({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return <div className="messenger-popup" role="dialog" aria-label="Messages"><MessengerExperience variant="popup" onClose={onClose} /></div>;
 }

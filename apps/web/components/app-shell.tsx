@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { UiIcon } from './ui-icon';
 import { useAppSession, usePreviewState } from './interaction-provider';
+import { MessengerPopup } from './messages-client';
 
 const desktopNavigation = [
   { href: '/', label: 'Home', icon: 'home' as const },
@@ -35,17 +36,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [messengerOpen, setMessengerOpen] = useState(false);
   const notificationsRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const notificationsButtonRef = useRef<HTMLButtonElement>(null);
+  const messengerButtonRef = useRef<HTMLButtonElement>(null);
   const { state, markNotificationsRead } = usePreviewState();
   const { viewer, mode } = useAppSession();
   const viewerName = viewer.profile?.displayName ?? viewer.username;
   const viewerInitial = viewerName[0]?.toUpperCase() ?? 'F';
 
-  useEffect(() => { setMenuOpen(false); setNotificationsOpen(false); }, [path]);
+  useEffect(() => { setMenuOpen(false); setNotificationsOpen(false); setMessengerOpen(false); }, [path]);
   useEffect(() => {
-    if (!menuOpen && !notificationsOpen) return;
+    if (!menuOpen && !notificationsOpen && !messengerOpen) return;
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
       if (menuOpen) {
@@ -55,6 +58,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (notificationsOpen) {
         setNotificationsOpen(false);
         notificationsButtonRef.current?.focus();
+      }
+      if (messengerOpen) {
+        setMessengerOpen(false);
+        messengerButtonRef.current?.focus();
       }
     }
     function closeNotifications(event: MouseEvent) {
@@ -70,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       document.removeEventListener('mousedown', closeNotifications);
       document.body.style.overflow = '';
     };
-  }, [menuOpen, notificationsOpen]);
+  }, [menuOpen, messengerOpen, notificationsOpen]);
 
   if (path.startsWith('/login') || path.startsWith('/register')) return <main className="auth">{children}</main>;
   const ownsHeader = path.startsWith('/activities/') || path.startsWith('/u/');
@@ -91,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  return <div className={`layout ${ownsHeader ? 'owns-mobile-header' : ''} ${mode === 'PREVIEW' ? 'preview-mode' : ''}`}>
+  return <div className={`layout ${ownsHeader ? 'owns-mobile-header' : ''} ${mode.toLowerCase()}-mode ${path.startsWith('/messages') ? 'messages-route' : ''}`}>
     <header className="desktop-topbar">
       <Link className="topbar-brand" href="/"><span className="brand-mark">F</span><strong>Flinkout</strong></Link>
       <form className="topbar-search" onSubmit={search}>
@@ -100,7 +107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </form>
       <div className="topbar-actions">
         <button ref={notificationsButtonRef} aria-label="Notifications" aria-expanded={notificationsOpen} onClick={toggleNotifications}><UiIcon name="bell" />{!state.notificationsRead && <span className="notification-dot" />}</button>
-        <Link href="/messages" aria-label="Messages"><UiIcon name="chat" /></Link>
+        <button ref={messengerButtonRef} aria-label="Messages" aria-expanded={messengerOpen} aria-pressed={messengerOpen} onClick={() => { setMessengerOpen(value => !value); setNotificationsOpen(false); }}><UiIcon name="chat" /></button>
         <Link href="/profile/edit" aria-label="Settings"><UiIcon name="settings" /></Link>
       </div>
     </header>
@@ -137,7 +144,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <strong>{viewerName}</strong><small>@{viewer.username}</small>
       </Link>
       <div className="desktop-nav-links">
-        {desktopNavigation.map(item => <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
+        {desktopNavigation.map(item => item.href === '/messages'
+          ? <button key={item.href} className={messengerOpen ? 'active' : ''} aria-expanded={messengerOpen} onClick={() => { setMessengerOpen(value => !value); setNotificationsOpen(false); }}><UiIcon name={item.icon} /><span>{item.label}</span></button>
+          : <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}><UiIcon name={item.icon} /><span>{item.label}</span></Link>)}
       </div>
       <Link className="nav-start-button" href="/record"><UiIcon name="play" />Start Activity</Link>
       <p className="nav-foot">Move together, safely.</p>
@@ -151,6 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {mode === 'PREVIEW' && <Link href="/login">Sign in</Link>}
     </div>}
     <Link href="/record" className="mobile-start-fab" aria-current={path.startsWith('/record') ? 'page' : undefined}><UiIcon name="activity" /><span>Start</span></Link>
+    <MessengerPopup open={messengerOpen} onClose={() => { setMessengerOpen(false); messengerButtonRef.current?.focus(); }} />
     <main className="main">{children}</main>
   </div>;
 }
