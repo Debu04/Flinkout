@@ -5,7 +5,7 @@ export type ActivityVisibility = typeof VISIBILITIES[number];
 export type RecordingStatus = 'RECORDING' | 'PAUSED' | 'FINISHED';
 export type SyncStatus = 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 export type RoutePoint = { latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; recordedAt: string };
-export type LocalActivity = { clientId: string; type: ActivityType; visibility: ActivityVisibility; status: RecordingStatus; syncStatus: SyncStatus; syncError: string | null; syncedActivityId: string | null; lastSyncAttemptAt: string | null; startedAt: string; endedAt: string | null; elapsedBeforePauseS: number; activeSince: string | null; distanceM: number; route: RoutePoint[]; createdAt: string; updatedAt: string };
+export type LocalActivity = { clientId: string; ownerId?: string; type: ActivityType; visibility: ActivityVisibility; status: RecordingStatus; published: boolean; syncStatus: SyncStatus; syncError: string | null; syncedActivityId: string | null; lastSyncAttemptAt: string | null; startedAt: string; endedAt: string | null; elapsedBeforePauseS: number; activeSince: string | null; distanceM: number; route: RoutePoint[]; createdAt: string; updatedAt: string };
 
 const earthRadiusM = 6_371_000;
 const radians = (degrees: number) => degrees * Math.PI / 180;

@@ -8,8 +8,9 @@ const now = () => new Date().toISOString();
 const failureMessage = (error: unknown) => error instanceof Error ? error.message : 'Synchronization failed';
 
 function patch(activity: LocalActivity, changes: Partial<LocalActivity>): LocalActivity { return { ...activity, ...changes, updatedAt: now() }; }
-export async function syncActivity(clientId: string): Promise<LocalActivity | undefined> {
+export async function syncActivity(clientId: string, expectedOwnerId?: string): Promise<LocalActivity | undefined> {
   const activity = await getActivity(clientId);
+  if (expectedOwnerId && activity?.ownerId !== expectedOwnerId) return activity;
   if (!activity || activity.status !== 'FINISHED' || activity.syncStatus === 'SYNCED' || inFlight.has(clientId)) return activity;
   if (!navigator.onLine) { const pending = patch(activity, { syncStatus: 'PENDING', syncError: null }); await putActivity(pending); return pending; }
   inFlight.add(clientId);
@@ -21,4 +22,9 @@ export async function syncActivity(clientId: string): Promise<LocalActivity | un
     const failed = patch(syncing, { syncStatus: 'FAILED', syncError: failureMessage(error) }); await putActivity(failed); return failed;
   } finally { inFlight.delete(clientId); }
 }
-export async function syncPendingActivities() { if (!navigator.onLine) return []; const pending = await getActivitiesReadyForSync(); return Promise.all(pending.map(activity => syncActivity(activity.clientId))); }
+export async function syncPendingActivities(expectedOwnerId?: string) {
+  if (!navigator.onLine) return [];
+  const pending = await getActivitiesReadyForSync();
+  const owned = expectedOwnerId ? pending.filter(activity => activity.ownerId === expectedOwnerId) : pending;
+  return Promise.all(owned.map(activity => syncActivity(activity.clientId, expectedOwnerId)));
+}

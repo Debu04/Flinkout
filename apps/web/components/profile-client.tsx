@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, type Profile, type SocialActivity, type User } from '../lib/api';
+import { demoActivities } from '../lib/demo-data';
 import { ActivityCard } from './activity-card';
-import { useInteractions } from './interaction-provider';
-
-const point = (latitude: number, longitude: number) => ({ latitude, longitude, accuracy: null, altitude: null, speed: null, recordedAt: new Date().toISOString() });
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 const baseProfile: Profile = { displayName: 'Marcus Rivera', bio: 'Everyday explorer, weekend trail guide, and believer that movement is better together.', photoUrl: null, profileVisibility: 'PUBLIC', routeVisibility: 'FOLLOWERS', discoverable: true };
 function previewUser(): User {
   if (typeof window !== 'undefined') {
@@ -15,10 +14,7 @@ function previewUser(): User {
   }
   return { id: 'demo-marcus', username: 'marcus_moves', profile: baseProfile, isSelf: true };
 }
-const previewActivities: SocialActivity[] = [{
-  id: 'demo-my-run', type: 'RUN', visibility: 'PUBLIC', startedAt: new Date(Date.now() - 86400000).toISOString(), endedAt: null, durationS: 2840, distanceM: 6300,
-  route: [point(34.052, -118.244), point(34.058, -118.238), point(34.055, -118.229)], user: { id: 'demo-marcus', username: 'marcus_moves', profile: { displayName: 'Marcus Rivera', photoUrl: null } }, reactionCount: 31, commentCount: 6, reactedByViewer: false,
-}];
+const previewActivities: SocialActivity[] = [demoActivities['demo-own-walk'].activity];
 
 function Avatar({ user }: { user: User }) {
   const photo = user.profile?.photoUrl;
@@ -28,23 +24,38 @@ function Avatar({ user }: { user: User }) {
 export function MyProfile() {
   const [user, setUser] = useState<User>(() => previewUser());
   const [activities, setActivities] = useState<SocialActivity[]>(previewActivities);
-  const [preview, setPreview] = useState(true);
   const { notify } = useInteractions();
+  const { viewer, mode } = useAppSession();
+  const { state, resetPreview } = usePreviewState();
+  const preview = mode !== 'CONNECTED';
   useEffect(() => {
-    api<{user: User}>('/auth/me').then(async response => {
-      setUser(response.user);
-      return api<{activities: SocialActivity[]}>(`/users/${response.user.username}/activities`);
-    }).then(response => { setActivities(response.activities); setPreview(false); }).catch(() => undefined);
-  }, []);
+    if (mode === 'CONNECTED') {
+      setUser(viewer);
+      void api<{activities: SocialActivity[]}>(`/users/${viewer.username}/activities`).then(response => setActivities(response.activities)).catch(() => undefined);
+    } else if (mode === 'PREVIEW') {
+      setUser(previewUser());
+      setActivities(previewActivities);
+    }
+  }, [mode, viewer]);
+  const visibleActivities = (preview ? [...state.postedActivities.filter(activity => activity.durationS >= 30), ...activities] : activities).filter((activity, index, all) =>
+    all.findIndex(candidate => candidate.id === activity.id || (activity.clientId && candidate.clientId === activity.clientId)) === index
+  );
   if (!user) return <p className="hint">Loading profile…</p>;
   return <section className="stack my-profile-page">
     {preview && <p className="demo-note">Local preview profile · changes are saved in this browser.</p>}
     <div className="profile-head card"><Avatar user={user}/><div className="grow"><h1>{user.profile?.displayName}</h1><p className="hint">@{user.username}</p></div><Link className="button secondary" href="/profile/edit">Edit profile</Link></div>
     <section className="card"><h2>About</h2><p>{user.profile?.bio || 'Add a bio to tell your movement community about you.'}</p></section>
     <h2>Recent activities</h2>
-    {activities.length ? activities.map(activity => <ActivityCard key={activity.id} initial={activity}/>) : <section className="card empty-state"><p>Activities you sync and share will appear here.</p></section>}
+    {visibleActivities.length ? visibleActivities.map(activity => <ActivityCard key={activity.id} initial={activity}/>) : <section className="card empty-state"><p>Activities you finish and choose to post will appear here.</p></section>}
     <button className="button danger" onClick={async () => {
-      if (preview) { notify('Preview profile reset for this session.'); return; }
+      if (preview) {
+        resetPreview();
+        localStorage.removeItem('flinkout-preview-profile');
+        setUser(previewUser());
+        setActivities(previewActivities);
+        notify('Preview activity, social, and profile data were reset.');
+        return;
+      }
       await api('/auth/logout', { method: 'POST' }); location.href = '/login';
     }}>{preview ? 'Reset preview session' : 'Log out'}</button>
   </section>;

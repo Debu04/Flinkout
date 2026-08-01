@@ -1,73 +1,151 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, type Comment, type SocialActivity } from '../lib/api';
-import { formatDistance, formatDuration, formatPace } from '../lib/activity';
-import { useInteractions } from './interaction-provider';
+import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
+import { getDemoActivity } from '../lib/demo-data';
+import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
-const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map detail-map" /> });
-const point = (latitude: number, longitude: number) => ({ latitude, longitude, accuracy: null, altitude: null, speed: null, recordedAt: new Date().toISOString() });
+const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map detail-map map-loading">Loading route...</div> });
 
-function sampleActivity(id: string): SocialActivity {
-  return { id, type: 'WALK', visibility: 'PUBLIC', startedAt: new Date(Date.now() - 3600000).toISOString(), endedAt: new Date().toISOString(), durationS: 3120, distanceM: 4200, route: [point(49.282, -123.12), point(49.276, -123.111), point(49.27, -123.105)], user: { id: 'demo-elena', username: 'elena_trails', profile: { displayName: 'Elena Rodriguez', photoUrl: null } }, reactionCount: 24, commentCount: 3, reactedByViewer: false };
-}
+const baseComments: Comment[] = [
+  { id: 'sample-comment-1', body: 'The path near the fountain is a bit slippery today. Watch your step.', createdAt: '2026-07-28T08:15:00.000Z', userId: 'demo-elena', isOwner: false, user: { id: 'demo-elena', username: 'elena_trails', profile: { displayName: 'Elena Rodriguez', photoUrl: null } } },
+  { id: 'sample-comment-2', body: 'Great viewpoint near the final turn. It is worth slowing down for a photo.', createdAt: '2026-07-28T07:40:00.000Z', userId: 'demo-james', isOwner: false, user: { id: 'demo-james', username: 'james_moves', profile: { displayName: 'James Chen', photoUrl: null } } },
+];
 
 export function ActivityDetail({ id }: { id: string }) {
+  const router = useRouter();
+  const demo = useMemo(() => getDemoActivity(id), [id]);
   const [activity, setActivity] = useState<SocialActivity>();
   const [comments, setComments] = useState<Comment[]>([]);
   const [error, setError] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
-  const [highFives, setHighFives] = useState(24);
-  const [highFived, setHighFived] = useState(false);
   const [helpful, setHelpful] = useState<string[]>([]);
   const { notify, share } = useInteractions();
+  const { viewer } = useAppSession();
+  const { state, hydrated, toggleReaction, addComment, deleteComment } = usePreviewState();
+  const isDemo = id.startsWith('demo-');
+  const postedActivity = state.postedActivities.find(item => item.id === id);
+  const isPreview = isDemo || Boolean(postedActivity);
+  const reacted = isPreview ? state.reactedActivityIds.includes(id) : activity?.reactedByViewer ?? false;
+  const previewComments = state.comments[id] ?? [];
 
   useEffect(() => {
-    if (id.startsWith('demo-')) {
-      setActivity(sampleActivity(id));
-      setComments([
-        { id: 'sample-comment-1', body: 'The path near the fountain is a bit slippery today due to the recent rain. Watch your step!', createdAt: new Date().toISOString(), userId: 'demo-sarah', isOwner: false, user: { id: 'demo-sarah', username: 'sarah', profile: { displayName: 'Sarah G.', photoUrl: null } } },
-        { id: 'sample-comment-2', body: 'Great spot for a photo right by the harbor master’s office. The flowers are in full bloom!', createdAt: new Date().toISOString(), userId: 'demo-david', isOwner: false, user: { id: 'demo-david', username: 'david', profile: { displayName: 'David K.', photoUrl: null } } },
-      ]);
+    if (isDemo) {
+      setActivity(demo.activity);
+      setComments(baseComments);
       return;
     }
+    if (postedActivity) {
+      setActivity(postedActivity);
+      setComments([]);
+      setError('');
+      return;
+    }
+    if (!hydrated) return;
     Promise.all([api<{ activity: SocialActivity }>(`/activities/${id}`), api<{ comments: Comment[] }>(`/activities/${id}/comments`)])
       .then(([a, c]) => { setActivity(a.activity); setComments(c.comments); })
       .catch(cause => setError(cause instanceof Error ? cause.message : 'Could not load activity'));
-  }, [id]);
+  }, [demo.activity, hydrated, id, isDemo, postedActivity]);
 
-  async function addComment(event: React.FormEvent) {
+  const allComments = useMemo(() => [
+    ...previewComments.map(comment => ({ id: comment.id, body: comment.body, createdAt: comment.createdAt, userId: viewer.id, isOwner: true, user: { id: viewer.id, username: viewer.username, profile: { displayName: viewer.profile?.displayName ?? viewer.username, photoUrl: viewer.profile?.photoUrl ?? null } } } satisfies Comment)),
+    ...comments,
+  ], [comments, previewComments, viewer]);
+
+  async function addActivityComment(event: React.FormEvent) {
     event.preventDefault();
-    if (!body.trim()) return;
-    if (id.startsWith('demo-')) { setComments(current => [{ id: `demo-${Date.now()}`, body: body.trim(), createdAt: new Date().toISOString(), userId: 'viewer', isOwner: true, user: { id: 'viewer', username: 'you', profile: { displayName: 'You', photoUrl: null } } }, ...current]); setBody(''); notify('Community note added.'); return; }
+    const nextBody = body.trim();
+    if (!nextBody) return;
+    if (isPreview) {
+      addComment(id, nextBody);
+      setBody('');
+      notify('Comment added.');
+      return;
+    }
     setSending(true);
-    try { const result = await api<{ comment: Comment }>(`/activities/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) }); setComments(current => [result.comment, ...current]); setBody(''); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not add note'); }
-    finally { setSending(false); }
+    try {
+      const result = await api<{ comment: Comment }>(`/activities/${id}/comments`, { method: 'POST', body: JSON.stringify({ body: nextBody }) });
+      setComments(current => [result.comment, ...current]);
+      setBody('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not add comment');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function removeActivityComment(comment: Comment) {
+    if (isPreview && previewComments.some(item => item.id === comment.id)) {
+      deleteComment(id, comment.id);
+      notify('Comment deleted.');
+      return;
+    }
+    try {
+      await api(`/activities/${id}/comments/${comment.id}`, { method: 'DELETE' });
+      setComments(current => current.filter(item => item.id !== comment.id));
+      notify('Comment deleted.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not delete comment');
+    }
+  }
+
+  async function highFive() {
+    if (!activity) return;
+    if (isPreview) {
+      toggleReaction(id);
+      notify(reacted ? 'High-five removed.' : 'High-five sent!');
+      return;
+    }
+    const previous = activity;
+    const nextReacted = !activity.reactedByViewer;
+    setActivity({ ...activity, reactedByViewer: nextReacted, reactionCount: activity.reactionCount + (nextReacted ? 1 : -1) });
+    try {
+      const result = await api<{ reacted: boolean; reactionCount: number }>(`/activities/${id}/reactions`, { method: nextReacted ? 'POST' : 'DELETE' });
+      setActivity(current => current ? { ...current, reactedByViewer: result.reacted, reactionCount: result.reactionCount } : current);
+    } catch {
+      setActivity(previous);
+      setError('Could not update your high-five.');
+    }
   }
 
   if (error && !activity) return <section className="card error-state"><h1>Activity unavailable</h1><p className="error">{error}</p><Link className="button" href="/">Back to feed</Link></section>;
   if (!activity) return <div className="card skeleton"><span /><span /><span /></div>;
 
+  const metadata = isDemo ? demo : {
+    title: `${labelFor(activity.type)} activity`,
+    location: activity.route?.length ? 'Recorded route' : 'Route not recorded',
+    description: activity.visibility === 'PRIVATE'
+      ? 'A private activity visible only to its owner.'
+      : activity.route?.length ? 'A completed Flinkout activity with a recorded route.' : 'A completed Flinkout activity without a GPS route.',
+    tags: [labelFor(activity.type)],
+    elevationM: 0,
+  };
+  const displayReactionCount = activity.reactionCount + (isPreview ? Number(reacted) - Number(activity.reactedByViewer) : 0);
+  const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h` : formatPace(activity.distanceM, activity.durationS);
+
   return <section className="session-detail-page">
-    <header className="standalone-mobile-header"><Link href="/" aria-label="Back">←</Link><strong>Activity</strong><button aria-label="Share activity" onClick={() => void share({ title: 'Morning Harbor Loop on Flinkout', text: 'Take a look at this shared activity.' })}><UiIcon name="share" /></button></header>
-    <div className="session-map-hero"><RouteMap points={activity.route ?? []} /><div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
+    <header className="standalone-mobile-header"><button onClick={() => router.back()} aria-label="Back">Back</button><strong>Activity</strong><button aria-label="Share activity" onClick={() => void share({ title: `${metadata.title} on Flinkout`, text: metadata.description })}><UiIcon name="share" /></button></header>
+    <div className="session-map-hero">{activity.route?.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state detail-route-empty"><UiIcon name="map" size={32} /><strong>No route was recorded</strong><span>This activity includes time and movement metrics only.</span></div>}<div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
     <div className="session-detail-grid">
       <main>
-        <section className="session-title-card"><div className="avatar small">E</div><div><h1>Morning Harbor Loop</h1><p>by {activity.user.profile?.displayName ?? activity.user.username}</p></div><span>#SunnyWalk</span></section>
-        <button className={`high-five-button ${highFived ? 'active' : ''}`} aria-pressed={highFived} onClick={() => { setHighFived(value => !value); setHighFives(value => value + (highFived ? -1 : 1)); notify(highFived ? 'High-five removed.' : 'High-five sent!'); }}>{highFived ? 'High-Five Sent' : 'Send High-Five'} <b>{highFives}</b></button>
-        <section className="session-timeline"><h2>Session Activity</h2><div><i className="mint">▷</i><span><strong>Session Started</strong><small>08:15 AM · Stanley Park Entrance</small></span></div><div><i className="peach">♥</i><span><strong>Marcus Chen sent a high-five!</strong><small>08:42 AM</small></span></div><div><i className="blue">♙</i><span><strong>Sarah &amp; Toby joined the walk</strong><small>08:55 AM · Seawall Crossing</small></span></div><div><i className="green">✓</i><span><strong>Session Completed</strong><small>09:07 AM · Harbor Marina</small></span></div></section>
+        <section className="session-title-card"><div className="avatar small">{activity.user.profile?.displayName?.[0] ?? activity.user.username[0]}</div><div><h1>{metadata.title}</h1><p>by <Link href={`/u/${activity.user.username}`}>{activity.user.profile?.displayName ?? activity.user.username}</Link> - {metadata.location}</p></div><span>#{metadata.tags[0]}</span></section>
+        <p className="activity-detail-description">{metadata.description}</p>
+        <button className={`high-five-button ${reacted ? 'active' : ''}`} aria-pressed={reacted} onClick={() => void highFive()}><UiIcon name="highfive" /> {reacted ? 'High-Five Sent' : 'Send High-Five'} <b>{displayReactionCount}</b></button>
+        <section className="session-timeline"><h2>Activity timeline</h2><div><i className="mint"><UiIcon name="play" size={16}/></i><span><strong>Activity started</strong><small>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</small></span></div><div><i className="blue"><UiIcon name="activity" size={16}/></i><span><strong>{formatDistance(activity.distanceM)} completed</strong><small>{labelFor(activity.type)} at {speedMetric}</small></span></div><div><i className="green"><UiIcon name="stop" size={16}/></i><span><strong>Activity completed</strong><small>{formatDuration(activity.durationS)} moving time</small></span></div></section>
       </main>
       <aside id="comments" className="community-notes">
-        <header><h2>Community Notes</h2><span>{comments.length} Notes</span></header>
-        {comments.map((comment, index) => <article key={comment.id}><small>{comment.isOwner ? 'YOUR NOTE' : index ? '☆ HIDDEN GEM' : '⌖ TRAIL CONDITION'}</small><p>“{comment.body}”</p><footer>{comment.isOwner ? 'Just now by You' : `${index ? '5h' : '2h'} ago by ${comment.user.profile?.displayName ?? comment.user.username}`}<span>{comment.isOwner && <button className="delete-note" onClick={() => { setComments(current => current.filter(value => value.id !== comment.id)); notify('Note deleted.'); }}>Delete</button>}<button className={helpful.includes(comment.id) ? 'helpful' : ''} aria-pressed={helpful.includes(comment.id)} onClick={() => setHelpful(current => current.includes(comment.id) ? current.filter(value => value !== comment.id) : [...current, comment.id])}>♧ {helpful.includes(comment.id) ? 'Helpful!' : 'Helpful'}</button></span></footer></article>)}
-        <form onSubmit={addComment}><label className="sr-only" htmlFor="comment">Add a note</label><input id="comment" value={body} onChange={event => setBody(event.target.value)} maxLength={500} placeholder="Add a note…" /><button disabled={sending}>{sending ? '…' : '＋ Add a note'}</button></form>
+        <header><h2>Comments</h2><span>{allComments.length} comments</span></header>
+        {allComments.map((comment, index) => <article key={comment.id}><small>{comment.isOwner ? 'YOUR COMMENT' : index ? 'COMMUNITY TIP' : 'ROUTE CONDITION'}</small><p>{comment.body}</p><footer>{comment.isOwner ? 'Just now by you' : `Shared by ${comment.user.profile?.displayName ?? comment.user.username}`}<span>{comment.isOwner && <button className="delete-note" onClick={() => void removeActivityComment(comment)}>Delete</button>}<button className={helpful.includes(comment.id) ? 'helpful' : ''} aria-pressed={helpful.includes(comment.id)} onClick={() => setHelpful(current => current.includes(comment.id) ? current.filter(value => value !== comment.id) : [...current, comment.id])}>{helpful.includes(comment.id) ? 'Helpful!' : 'Helpful'}</button></span></footer></article>)}
+        <form onSubmit={addActivityComment}><label className="sr-only" htmlFor="comment">Add a comment</label><input id="comment" value={body} onChange={event => setBody(event.target.value)} maxLength={500} placeholder="Add a comment..." /><button disabled={sending || !body.trim()}>{sending ? 'Posting...' : 'Add comment'}</button></form>
+        {error && <p className="error" role="alert">{error}</p>}
       </aside>
     </div>
-    <section className="desktop-session-summary"><h2>Morning Ridge Run</h2><p>October 14, 2023 · 08:30 AM</p><div><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>Pace</small><strong>{formatPace(activity.distanceM, activity.durationS)}</strong></span><span><small>Elevation</small><strong>312 m</strong></span></div></section>
+    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{speedMetric}</strong></span><span><small>Elevation</small><strong>{metadata.elevationM ? `${metadata.elevationM} m` : 'Not available'}</strong></span></div></section>
   </section>;
 }
