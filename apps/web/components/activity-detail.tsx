@@ -4,13 +4,14 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { api, type Comment, type SocialActivity } from '../lib/api';
+import { api, type ActivityTimelineEvent, type Comment, type SocialActivity } from '../lib/api';
 import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
 import { getDemoActivity } from '../lib/demo-data';
 import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
 const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map detail-map map-loading">Loading route...</div> });
+const sourceLabel = (activity: Pick<SocialActivity, 'distanceSource' | 'route' | 'steps'>) => ({ GPS: 'GPS', MOTION: 'motion estimate', FUSED: 'GPS + motion', NONE: 'timer only' })[activity.distanceSource ?? (activity.route?.length ? 'GPS' : activity.steps ? 'MOTION' : 'NONE')];
 
 const baseComments: Comment[] = [
   { id: 'sample-comment-1', body: 'The path near the fountain is a bit slippery today. Watch your step.', createdAt: '2026-07-28T08:15:00.000Z', userId: 'demo-elena', isOwner: false, user: { id: 'demo-elena', username: 'elena_trails', profile: { displayName: 'Elena Rodriguez', photoUrl: null } } },
@@ -64,6 +65,7 @@ export function ActivityDetail({ id }: { id: string }) {
     if (!nextBody) return;
     if (isPreview) {
       addComment(id, nextBody);
+      setActivity(current => current ? { ...current, timeline: [...(current.timeline ?? []), { id: `preview-comment-${crypto.randomUUID()}`, type: 'COMMENT', source: 'ACTIVITY', createdAt: new Date().toISOString(), body: nextBody, user: { id: viewer.id, username: viewer.username, displayName: viewer.profile?.displayName ?? viewer.username, photoUrl: viewer.profile?.photoUrl ?? null } }] } : current);
       setBody('');
       notify('Comment added.');
       return;
@@ -72,6 +74,7 @@ export function ActivityDetail({ id }: { id: string }) {
     try {
       const result = await api<{ comment: Comment }>(`/activities/${id}/comments`, { method: 'POST', body: JSON.stringify({ body: nextBody }) });
       setComments(current => [result.comment, ...current]);
+      setActivity(current => current ? { ...current, timeline: [...(current.timeline ?? []), { id: `activity-comment-${result.comment.id}`, type: 'COMMENT', source: 'ACTIVITY', createdAt: result.comment.createdAt, body: result.comment.body, user: { id: result.comment.user.id, username: result.comment.user.username, displayName: result.comment.user.profile?.displayName ?? result.comment.user.username, photoUrl: result.comment.user.profile?.photoUrl ?? null } }] } : current);
       setBody('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not add comment');
@@ -122,22 +125,33 @@ export function ActivityDetail({ id }: { id: string }) {
     location: activity.route?.length ? 'Recorded route' : 'Route not recorded',
     description: activity.visibility === 'PRIVATE'
       ? 'A private activity visible only to its owner.'
-      : activity.route?.length ? 'A completed Flinkout activity with a recorded route.' : 'A completed Flinkout activity without a GPS route.',
+      : activity.route?.length ? 'A completed Flinkout activity with a recorded route.' : activity.steps ? 'A completed Flinkout activity with motion-estimated steps and distance.' : 'A completed Flinkout activity without a GPS route.',
     tags: [labelFor(activity.type)],
     elevationM: 0,
   };
   const displayReactionCount = activity.reactionCount + (isPreview ? Number(reacted) - Number(activity.reactedByViewer) : 0);
   const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h` : formatPace(activity.distanceM, activity.durationS);
+  const timeline: ActivityTimelineEvent[] = activity.timeline?.length ? activity.timeline : [
+    { id: `${activity.id}-start`, type: 'START', source: 'ACTIVITY', createdAt: activity.startedAt },
+    ...(activity.endedAt ? [{ id: `${activity.id}-finish`, type: 'FINISH' as const, source: 'ACTIVITY' as const, createdAt: activity.endedAt }] : []),
+  ];
+  const timelineLabel = (event: ActivityTimelineEvent) => event.type === 'START' ? 'Activity started'
+    : event.type === 'LIVE_STARTED' ? 'Live sharing started'
+      : event.type === 'JOINED' ? `${event.user?.displayName ?? 'Someone'} joined live`
+        : event.type === 'COMMENT' ? `${event.user?.displayName ?? 'Someone'} shared ${event.source === 'LIVE' ? 'a live update' : 'a comment'}`
+          : event.type === 'HIGH_FIVE' ? `${event.user?.displayName ?? 'Someone'} sent a high-five`
+            : event.type === 'LIVE_ENDED' ? 'Live sharing ended'
+              : 'Activity completed';
 
   return <section className="session-detail-page">
     <header className="standalone-mobile-header"><button onClick={() => router.back()} aria-label="Back">Back</button><strong>Activity</strong><button aria-label="Share activity" onClick={() => void share({ title: `${metadata.title} on Flinkout`, text: metadata.description })}><UiIcon name="share" /></button></header>
-    <div className="session-map-hero">{activity.route?.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state detail-route-empty"><UiIcon name="map" size={32} /><strong>No route was recorded</strong><span>This activity includes time and movement metrics only.</span></div>}<div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
+    <div className="session-map-hero">{activity.route?.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state detail-route-empty"><UiIcon name="map" size={32} /><strong>No GPS route was recorded</strong><span>{activity.steps ? `${activity.steps.toLocaleString()} steps were captured using phone motion sensors.` : 'This activity includes time and movement metrics only.'}</span></div>}<div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
     <div className="session-detail-grid">
       <main>
         <section className="session-title-card"><div className="avatar small">{activity.user.profile?.displayName?.[0] ?? activity.user.username[0]}</div><div><h1>{metadata.title}</h1><p>by <Link href={`/u/${activity.user.username}`}>{activity.user.profile?.displayName ?? activity.user.username}</Link> - {metadata.location}</p></div><span>#{metadata.tags[0]}</span></section>
         <p className="activity-detail-description">{metadata.description}</p>
         <button className={`high-five-button ${reacted ? 'active' : ''}`} aria-pressed={reacted} onClick={() => void highFive()}><UiIcon name="highfive" /> {reacted ? 'High-Five Sent' : 'Send High-Five'} <b>{displayReactionCount}</b></button>
-        <section className="session-timeline"><h2>Activity timeline</h2><div><i className="mint"><UiIcon name="play" size={16}/></i><span><strong>Activity started</strong><small>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</small></span></div><div><i className="blue"><UiIcon name="activity" size={16}/></i><span><strong>{formatDistance(activity.distanceM)} completed</strong><small>{labelFor(activity.type)} at {speedMetric}</small></span></div><div><i className="green"><UiIcon name="stop" size={16}/></i><span><strong>Activity completed</strong><small>{formatDuration(activity.durationS)} moving time</small></span></div></section>
+        <section className="session-timeline"><header><h2>Activity timeline</h2><span>{timeline.length} moments</span></header>{timeline.map(event => <div key={event.id}><i className={event.type === 'START' ? 'mint' : event.type === 'FINISH' || event.type === 'LIVE_ENDED' ? 'green' : event.type === 'COMMENT' ? 'blue' : 'peach'}><UiIcon name={event.type === 'START' ? 'play' : event.type === 'FINISH' || event.type === 'LIVE_ENDED' ? 'stop' : event.type === 'COMMENT' ? 'chat' : event.type === 'HIGH_FIVE' ? 'highfive' : event.type === 'JOINED' ? 'group' : 'radio'} size={16}/></i><span><strong>{timelineLabel(event)}</strong>{event.body && <p>{event.body}</p>}<small>{new Date(event.createdAt).toLocaleString()}{event.type === 'FINISH' ? ` - ${formatDistance(activity.distanceM)} in ${formatDuration(activity.durationS)}` : event.latitude !== undefined ? ' - approximate map location saved' : ''}</small></span></div>)}</section>
       </main>
       <aside id="comments" className="community-notes">
         <header><h2>Comments</h2><span>{allComments.length} comments</span></header>
@@ -146,6 +160,6 @@ export function ActivityDetail({ id }: { id: string }) {
         {error && <p className="error" role="alert">{error}</p>}
       </aside>
     </div>
-    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{speedMetric}</strong></span><span><small>Elevation</small><strong>{metadata.elevationM ? `${metadata.elevationM} m` : 'Not available'}</strong></span></div></section>
+    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{speedMetric}</strong></span><span><small>{activity.type === 'RIDE' ? 'GPS samples' : 'Steps'}</small><strong>{activity.type === 'RIDE' ? activity.route?.length ?? 0 : (activity.steps ?? 0).toLocaleString()}</strong></span></div></section>
   </section>;
 }

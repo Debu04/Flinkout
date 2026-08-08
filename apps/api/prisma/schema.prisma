@@ -31,41 +31,49 @@ enum ActivityVisibility {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique @db.VarChar(254)
-  passwordHash String    @map("password_hash") @db.VarChar(255)
-  username     String    @unique @db.VarChar(30)
-  profile      Profile?
-  sessions     Session[]
-  following    Follow[]  @relation("following")
-  followers    Follow[]  @relation("followers")
-  activities   Activity[]
-  reactions    ActivityReaction[]
-  comments     ActivityComment[]
+  id             String                 @id @default(cuid())
+  email          String                 @unique @db.VarChar(254)
+  passwordHash   String                 @map("password_hash") @db.VarChar(255)
+  username       String                 @unique @db.VarChar(30)
+  profile        Profile?
+  sessions       Session[]
+  following      Follow[]               @relation("following")
+  followers      Follow[]               @relation("followers")
+  activities     Activity[]
+  reactions      ActivityReaction[]
+  comments       ActivityComment[]
   liveActivities LiveActivity[]
   liveJoins      LiveActivityJoin[]
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  liveComments   LiveActivityComment[]
+  liveHighFives  LiveActivityHighFive[]
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model LiveActivity {
-  id            String             @id @default(cuid())
-  userId        String             @map("user_id")
+  id            String                 @id @default(cuid())
+  userId        String                 @map("user_id")
+  clientId      String?                @map("client_id") @db.Char(36)
   type          ActivityType
-  visibility    ActivityVisibility @default(FOLLOWERS)
+  visibility    ActivityVisibility     @default(FOLLOWERS)
   latitude      Float
   longitude     Float
-  durationS     Int                @default(0) @map("duration_s")
-  distanceM     Int                @default(0) @map("distance_m")
-  active        Boolean            @default(true)
-  startedAt     DateTime           @default(now()) @map("started_at")
-  lastUpdatedAt DateTime           @updatedAt @map("last_updated_at")
-  endedAt       DateTime?          @map("ended_at")
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  durationS     Int                    @default(0) @map("duration_s")
+  distanceM     Int                    @default(0) @map("distance_m")
+  speedKmh      Float                  @default(0) @map("speed_kmh")
+  paused        Boolean                @default(false)
+  active        Boolean                @default(true)
+  startedAt     DateTime               @default(now()) @map("started_at")
+  lastUpdatedAt DateTime               @updatedAt @map("last_updated_at")
+  endedAt       DateTime?              @map("ended_at")
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   joins         LiveActivityJoin[]
+  comments      LiveActivityComment[]
+  highFives     LiveActivityHighFive[]
 
+  @@unique([userId, clientId])
   @@index([userId, active])
   @@index([active, visibility, latitude, longitude])
   @@map("live_activities")
@@ -74,6 +82,8 @@ model LiveActivity {
 model LiveActivityJoin {
   liveActivityId String       @map("live_activity_id")
   userId         String       @map("user_id")
+  active         Boolean      @default(true)
+  leftAt         DateTime?    @map("left_at")
   createdAt      DateTime     @default(now()) @map("created_at")
   liveActivity   LiveActivity @relation(fields: [liveActivityId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -81,6 +91,34 @@ model LiveActivityJoin {
   @@id([liveActivityId, userId])
   @@index([userId, createdAt])
   @@map("live_activity_joins")
+}
+
+model LiveActivityComment {
+  id             String       @id @default(cuid())
+  liveActivityId String       @map("live_activity_id")
+  userId         String       @map("user_id")
+  body           String       @db.VarChar(500)
+  latitude       Float
+  longitude      Float
+  createdAt      DateTime     @default(now()) @map("created_at")
+  liveActivity   LiveActivity @relation(fields: [liveActivityId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([liveActivityId, createdAt])
+  @@index([userId, createdAt])
+  @@map("live_activity_comments")
+}
+
+model LiveActivityHighFive {
+  liveActivityId String       @map("live_activity_id")
+  userId         String       @map("user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  liveActivity   LiveActivity @relation(fields: [liveActivityId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([liveActivityId, userId])
+  @@index([userId, createdAt])
+  @@map("live_activity_high_fives")
 }
 
 model ActivityHeatCell {
@@ -96,28 +134,30 @@ model ActivityHeatCell {
 }
 
 model Activity {
-  id         String             @id @default(cuid())
-  userId     String             @map("user_id")
-  clientId   String             @map("client_id") @db.Char(36)
-  type       ActivityType
-  visibility ActivityVisibility @default(PRIVATE)
-  startedAt  DateTime           @map("started_at")
-  endedAt    DateTime?          @map("ended_at")
-  durationS  Int                @default(0) @map("duration_s")
-  distanceM  Int                @default(0) @map("distance_m")
-  startLat   Float?             @map("start_lat")
-  startLng   Float?             @map("start_lng")
-  route      Json?
-  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reactions  ActivityReaction[]
-  comments   ActivityComment[]
-  createdAt  DateTime           @default(now()) @map("created_at")
-  updatedAt  DateTime           @updatedAt @map("updated_at")
+  id             String             @id @default(cuid())
+  userId         String             @map("user_id")
+  clientId       String             @map("client_id") @db.Char(36)
+  type           ActivityType
+  visibility     ActivityVisibility @default(PRIVATE)
+  startedAt      DateTime           @map("started_at")
+  endedAt        DateTime?          @map("ended_at")
+  durationS      Int                @default(0) @map("duration_s")
+  distanceM      Int                @default(0) @map("distance_m")
+  steps          Int                @default(0)
+  distanceSource String             @default("NONE") @map("distance_source") @db.VarChar(16)
+  startLat       Float?             @map("start_lat")
+  startLng       Float?             @map("start_lng")
+  route          Json?
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactions      ActivityReaction[]
+  comments       ActivityComment[]
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
 
+  @@unique([userId, clientId])
   @@index([userId, startedAt])
   @@index([visibility, startedAt])
   @@index([visibility, startLat, startLng])
-  @@unique([userId, clientId])
   @@map("activities")
 }
 
