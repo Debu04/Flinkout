@@ -1,11 +1,14 @@
+import type { ActivityTimelineEvent } from './api';
+
 export const ACTIVITY_TYPES = ['WALK', 'RUN', 'RIDE', 'HIKE'] as const;
 export const VISIBILITIES = ['PUBLIC', 'FOLLOWERS', 'PRIVATE'] as const;
 export type ActivityType = typeof ACTIVITY_TYPES[number];
 export type ActivityVisibility = typeof VISIBILITIES[number];
 export type RecordingStatus = 'RECORDING' | 'PAUSED' | 'FINISHED';
 export type SyncStatus = 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
+export type DistanceSource = 'GPS' | 'MOTION' | 'FUSED' | 'NONE';
 export type RoutePoint = { latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; recordedAt: string };
-export type LocalActivity = { clientId: string; ownerId?: string; type: ActivityType; visibility: ActivityVisibility; status: RecordingStatus; published: boolean; syncStatus: SyncStatus; syncError: string | null; syncedActivityId: string | null; lastSyncAttemptAt: string | null; startedAt: string; endedAt: string | null; elapsedBeforePauseS: number; activeSince: string | null; distanceM: number; route: RoutePoint[]; createdAt: string; updatedAt: string };
+export type LocalActivity = { clientId: string; ownerId?: string; type: ActivityType; visibility: ActivityVisibility; status: RecordingStatus; published: boolean; syncStatus: SyncStatus; syncError: string | null; syncedActivityId: string | null; lastSyncAttemptAt: string | null; startedAt: string; endedAt: string | null; elapsedBeforePauseS: number; activeSince: string | null; distanceM: number; gpsDistanceM?: number; sensorDistanceM?: number; sensorDistanceOffsetM?: number; steps?: number; strideM?: number; distanceSource?: DistanceSource; lastSensorAt?: string | null; route: RoutePoint[]; liveRequested?: boolean; liveSessionId?: string | null; liveEndStatus?: 'ENDED' | 'UNCONFIRMED' | null; timeline?: ActivityTimelineEvent[]; createdAt: string; updatedAt: string };
 
 const earthRadiusM = 6_371_000;
 const radians = (degrees: number) => degrees * Math.PI / 180;

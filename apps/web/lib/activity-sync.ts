@@ -16,7 +16,7 @@ export async function syncActivity(clientId: string, expectedOwnerId?: string): 
   inFlight.add(clientId);
   const syncing = patch(activity, { syncStatus: 'SYNCING', syncError: null, lastSyncAttemptAt: now() }); await putActivity(syncing);
   try {
-    const response = await api<SyncResponse>('/activities/sync', { method: 'POST', body: JSON.stringify({ clientId: syncing.clientId, type: syncing.type, visibility: syncing.visibility, startedAt: syncing.startedAt, endedAt: syncing.endedAt, durationS: syncing.elapsedBeforePauseS, distanceM: syncing.distanceM, route: syncing.route }) });
+    const response = await api<SyncResponse>('/activities/sync', { method: 'POST', body: JSON.stringify({ clientId: syncing.clientId, type: syncing.type, visibility: syncing.visibility, startedAt: syncing.startedAt, endedAt: syncing.endedAt, durationS: syncing.elapsedBeforePauseS, distanceM: syncing.distanceM, steps: syncing.steps ?? 0, distanceSource: syncing.distanceSource ?? 'NONE', route: syncing.route }) });
     const synced = patch(syncing, { syncStatus: 'SYNCED', syncError: null, syncedActivityId: response.activityId }); await putActivity(synced); return synced;
   } catch (error) {
     const failed = patch(syncing, { syncStatus: 'FAILED', syncError: failureMessage(error) }); await putActivity(failed); return failed;

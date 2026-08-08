@@ -4,28 +4,60 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ACTIVITY_TYPES, averageSpeedKmh, distanceBetween, elapsedSeconds, formatDistance, formatDuration, formatPace, labelFor, shouldKeepPoint, type ActivityType, type LocalActivity, type RoutePoint } from '../lib/activity';
+import { detectStep, distanceSourceLabel, initialStepDetectorState, recordGpsSegment, recordMotionStep } from '../lib/activity-motion';
 import { deleteActivity, getIncompleteActivity, putActivity } from '../lib/activity-db';
 import { syncActivity, syncPendingActivities } from '../lib/activity-sync';
-import { api, type SocialActivity } from '../lib/api';
+import { api, type ActivityTimelineEvent, type LiveActivity, type SocialActivity } from '../lib/api';
 import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
 const RouteMap = dynamic(() => import('./route-map').then(module => module.RouteMap), { ssr: false, loading: () => <div className="map map-loading" aria-label="Loading route map">Loading map...</div> });
 type Screen = 'PICKER' | 'LIVE' | 'SUMMARY';
+type SharingChoice = 'RECORD_ONLY' | 'LIVE';
+type MotionStatus = 'IDLE' | 'READY' | 'CHECKING' | 'ACTIVE' | 'NEEDS_PERMISSION' | 'DENIED' | 'UNAVAILABLE' | 'NOT_USED';
+type DeviceAccessState = 'CHECKING' | 'PROMPT' | 'REQUESTING' | 'GRANTED' | 'DENIED' | 'UNAVAILABLE' | 'INSECURE';
+type MotionPermissionConstructor = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
+type LinearSensor = EventTarget & { x: number | null; y: number | null; z: number | null; start: () => void; stop: () => void };
+type LinearSensorConstructor = new (options: { frequency: number }) => LinearSensor;
 const now = () => new Date().toISOString();
+
+function instantaneousSpeed(activity: LocalActivity) {
+  const latest = activity.route.at(-1)?.speed;
+  return latest !== null && latest !== undefined && latest >= 0 ? latest * 3.6 : averageSpeedKmh(activity.distanceM, elapsedSeconds(activity));
+}
+
+function completeTimeline(activity: LocalActivity, liveTimeline: ActivityTimelineEvent[] | undefined, endedAt: string): ActivityTimelineEvent[] {
+  const events: ActivityTimelineEvent[] = [
+    { id: `${activity.clientId}-start`, type: 'START', source: 'ACTIVITY', createdAt: activity.startedAt },
+    ...(liveTimeline ?? activity.timeline ?? []).filter(event => event.type !== 'START' && event.type !== 'FINISH'),
+    { id: `${activity.clientId}-finish`, type: 'FINISH', source: 'ACTIVITY', createdAt: endedAt },
+  ];
+  return [...new Map(events.map(event => [event.id, event])).values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+}
 
 export function ActivityRecorder() {
   const router = useRouter();
   const [activity, setActivity] = useState<LocalActivity>();
   const [screen, setScreen] = useState<Screen>('PICKER');
   const [selected, setSelected] = useState<ActivityType>('WALK');
+  const [sharingChoice, setSharingChoice] = useState<SharingChoice>('RECORD_ONLY');
+  const [liveVisibility, setLiveVisibility] = useState<'FOLLOWERS' | 'PUBLIC'>('FOLLOWERS');
   const [gps, setGps] = useState('GPS will start when you record.');
+  const [secureContext, setSecureContext] = useState<'CHECKING' | 'SECURE' | 'INSECURE'>('CHECKING');
+  const [locationAccess, setLocationAccess] = useState<DeviceAccessState>('CHECKING');
+  const [motionStatus, setMotionStatus] = useState<MotionStatus>('IDLE');
+  const [motionMessage, setMotionMessage] = useState('Motion sensors will be checked when you start.');
   const [online, setOnline] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const [live, setLive] = useState(false);
+  const [liveActivity, setLiveActivity] = useState<LiveActivity>();
   const [livePending, setLivePending] = useState(false);
+  const [liveAttempted, setLiveAttempted] = useState(false);
   const [liveMessage, setLiveMessage] = useState('');
+  const [liveCommentBody, setLiveCommentBody] = useState('');
+  const [liveCommentPending, setLiveCommentPending] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [storageState, setStorageState] = useState<'CHECKING' | 'READY' | 'ERROR'>('CHECKING');
   const [startPending, setStartPending] = useState(false);
@@ -36,6 +68,11 @@ export function ActivityRecorder() {
   const { viewer, mode } = useAppSession();
   const watchId = useRef<number | undefined>(undefined);
   const activityRef = useRef<LocalActivity | undefined>(undefined);
+  const motionDetectorRef = useRef(initialStepDetectorState());
+  const motionCleanupRef = useRef<(() => void) | undefined>(undefined);
+  const motionPermissionGrantedRef = useRef(false);
+  const motionRunningRef = useRef(false);
+  const locationSeedRef = useRef<GeolocationPosition | undefined>(undefined);
 
   const checkStorage = useCallback(async () => {
     setRestoring(true);
@@ -47,8 +84,10 @@ export function ActivityRecorder() {
       if (found) {
         setActivity(found);
         setSelected(found.type);
+        setSharingChoice(found.liveRequested || found.liveSessionId ? 'LIVE' : 'RECORD_ONLY');
+        setLiveVisibility(found.visibility === 'PUBLIC' ? 'PUBLIC' : 'FOLLOWERS');
         setScreen(found.status === 'FINISHED' ? 'SUMMARY' : 'LIVE');
-        setGps(found.status === 'PAUSED' ? 'Recording restored and paused.' : 'Recording restored. Reconnecting to GPS…');
+        setGps(found.status === 'PAUSED' ? 'Recording restored and paused.' : 'Recording restored. Reconnecting to GPS...');
       }
     } catch {
       setStorageState('ERROR');
@@ -61,13 +100,10 @@ export function ActivityRecorder() {
 
   useEffect(() => {
     activityRef.current = activity;
-    setElapsed(activity ? elapsedSeconds(activity) : 0);
   }, [activity]);
 
   useEffect(() => {
-    const update = () => {
-      setOnline(navigator.onLine);
-    };
+    const update = () => setOnline(navigator.onLine);
     setOnline(navigator.onLine);
     addEventListener('online', update);
     addEventListener('offline', update);
@@ -76,8 +112,44 @@ export function ActivityRecorder() {
       removeEventListener('online', update);
       removeEventListener('offline', update);
       if (watchId.current !== undefined) navigator.geolocation?.clearWatch(watchId.current);
+      motionCleanupRef.current?.();
     };
   }, [checkStorage]);
+
+  useEffect(() => {
+    if (!window.isSecureContext) {
+      setSecureContext('INSECURE');
+      setLocationAccess('INSECURE');
+      setMotionStatus('UNAVAILABLE');
+      setMotionMessage('Mobile browsers require HTTPS before they can ask for motion access.');
+      setStartError('Device permissions are blocked on an insecure address. Open Flinkout over HTTPS; a phone cannot use the desktop localhost exception.');
+      return;
+    }
+    setSecureContext('SECURE');
+    if (!navigator.geolocation) {
+      setLocationAccess('UNAVAILABLE');
+      return;
+    }
+    if (!navigator.permissions?.query) {
+      setLocationAccess('PROMPT');
+      return;
+    }
+    let cancelled = false;
+    let permission: PermissionStatus | undefined;
+    const updatePermission = () => {
+      if (!cancelled && permission) setLocationAccess(permission.state === 'granted' ? 'GRANTED' : permission.state === 'denied' ? 'DENIED' : 'PROMPT');
+    };
+    void navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (cancelled) return;
+      permission = result;
+      updatePermission();
+      permission.addEventListener('change', updatePermission);
+    }).catch(() => { if (!cancelled) setLocationAccess('PROMPT'); });
+    return () => {
+      cancelled = true;
+      permission?.removeEventListener('change', updatePermission);
+    };
+  }, []);
 
   useEffect(() => {
     if (mode !== 'CONNECTED' || !navigator.onLine) return;
@@ -94,11 +166,18 @@ export function ActivityRecorder() {
   }, [mode, viewer.id]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (activityRef.current) setElapsed(elapsedSeconds(activityRef.current));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      const current = activityRef.current;
+      setElapsed(current ? elapsedSeconds(current) : 0);
+      if (current?.status === 'RECORDING' && current.activeSince) {
+        const activeForMs = Math.max(0, Date.now() - Date.parse(current.activeSince));
+        timer = setTimeout(tick, Math.max(80, 1_000 - activeForMs % 1_000));
+      }
+    };
+    tick();
+    return () => { if (timer) clearTimeout(timer); };
+  }, [activity?.clientId, activity?.status, activity?.activeSince, activity?.elapsedBeforePauseS]);
 
   const persist = useCallback((next: LocalActivity) => {
     activityRef.current = next;
@@ -109,6 +188,183 @@ export function ActivityRecorder() {
     });
   }, []);
 
+  const requestLocationAccess = useCallback(() => new Promise<boolean>(resolve => {
+    if (!window.isSecureContext) {
+      setSecureContext('INSECURE');
+      setLocationAccess('INSECURE');
+      setStartError('Location permission cannot open on this phone because Flinkout is using HTTP. Reopen it from an HTTPS address.');
+      resolve(false);
+      return;
+    }
+    if (!navigator.geolocation) {
+      setLocationAccess('UNAVAILABLE');
+      setGps('Location is not available in this browser.');
+      resolve(false);
+      return;
+    }
+    setLocationAccess('REQUESTING');
+    setGps('Waiting for location permission...');
+    navigator.geolocation.getCurrentPosition(position => {
+      locationSeedRef.current = position;
+      setLocationAccess('GRANTED');
+      setGps(`Location access granted (+/-${Math.round(position.coords.accuracy)} m).`);
+      resolve(true);
+    }, error => {
+      locationSeedRef.current = undefined;
+      if (error.code === error.PERMISSION_DENIED) {
+        setLocationAccess('DENIED');
+        setGps('Location access was denied. Enable it in this site\'s browser settings, then try again.');
+      } else {
+        setLocationAccess('UNAVAILABLE');
+        setGps(error.code === error.TIMEOUT ? 'Location permission was allowed, but the phone could not get a GPS fix yet.' : 'The phone could not provide a location. Move outdoors and retry.');
+      }
+      resolve(false);
+    }, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 });
+  }), []);
+
+  const requestMotionAccess = useCallback(async () => {
+    if (!window.isSecureContext) {
+      setMotionStatus('UNAVAILABLE');
+      setMotionMessage('Motion permission cannot open over HTTP. Reopen Flinkout from an HTTPS address.');
+      return false;
+    }
+    const MotionConstructor = window.DeviceMotionEvent as MotionPermissionConstructor | undefined;
+    const SensorConstructor = (window as Window & { LinearAccelerationSensor?: LinearSensorConstructor }).LinearAccelerationSensor;
+    if (!MotionConstructor && !SensorConstructor) {
+      setMotionStatus('UNAVAILABLE');
+      setMotionMessage('This browser does not expose motion sensors to websites.');
+      return false;
+    }
+    if (typeof MotionConstructor?.requestPermission === 'function' && !motionPermissionGrantedRef.current) {
+      setMotionStatus('CHECKING');
+      setMotionMessage('Waiting for motion sensor permission...');
+      try {
+        motionPermissionGrantedRef.current = await MotionConstructor.requestPermission() === 'granted';
+      } catch {
+        motionPermissionGrantedRef.current = false;
+      }
+      if (!motionPermissionGrantedRef.current) {
+        setMotionStatus('DENIED');
+        setMotionMessage('Motion access was denied. Enable Motion & Orientation Access in this site\'s browser settings.');
+        return false;
+      }
+    } else {
+      motionPermissionGrantedRef.current = true;
+    }
+    setMotionStatus('READY');
+    setMotionMessage('Motion access is ready. Step tracking will begin with the activity.');
+    return true;
+  }, []);
+
+  const stopMotionSensors = useCallback(() => {
+    motionCleanupRef.current?.();
+    motionCleanupRef.current = undefined;
+    motionRunningRef.current = false;
+  }, []);
+
+  const beginMotionSensors = useCallback(async (type: ActivityType, requestPermission: boolean) => {
+    stopMotionSensors();
+    motionDetectorRef.current = initialStepDetectorState();
+    if (type === 'RIDE') {
+      setMotionStatus('NOT_USED');
+      setMotionMessage('Ride distance uses GPS; accelerometer-only distance would drift and is not reported as accurate.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setMotionStatus('UNAVAILABLE');
+      setMotionMessage('Motion sensors require a secure connection. GPS and timing will continue.');
+      return;
+    }
+    motionRunningRef.current = true;
+
+    let sampleSeen = false;
+    const acceptSample = (x: number | null, y: number | null, z: number | null, includesGravity: boolean, timestamp: number) => {
+      if (x === null || y === null || z === null) return;
+      sampleSeen = true;
+      setMotionStatus('ACTIVE');
+      setMotionMessage('Motion sensors are tracking steps and can estimate distance if GPS drops out.');
+      const result = detectStep(motionDetectorRef.current, { x, y, z, includesGravity, timestamp });
+      motionDetectorRef.current = result.state;
+      const current = activityRef.current;
+      if (result.step && current?.status === 'RECORDING') persist(recordMotionStep(current, now()));
+    };
+
+    const startDeviceMotion = async () => {
+      const MotionConstructor = window.DeviceMotionEvent as MotionPermissionConstructor | undefined;
+      if (!MotionConstructor) {
+        motionRunningRef.current = false;
+        setMotionStatus('UNAVAILABLE');
+        setMotionMessage('This browser does not expose motion sensors. GPS and timing will continue.');
+        return;
+      }
+      if (typeof MotionConstructor.requestPermission === 'function' && !motionPermissionGrantedRef.current) {
+        if (!requestPermission) {
+          motionRunningRef.current = false;
+          setMotionStatus('NEEDS_PERMISSION');
+          setMotionMessage('Tap enable to restore step and motion-distance tracking.');
+          return;
+        }
+        try {
+          motionPermissionGrantedRef.current = await MotionConstructor.requestPermission() === 'granted';
+        } catch {
+          motionPermissionGrantedRef.current = false;
+        }
+        if (!motionPermissionGrantedRef.current) {
+          motionRunningRef.current = false;
+          setMotionStatus('DENIED');
+          setMotionMessage('Motion access was denied. GPS and timing will continue.');
+          return;
+        }
+      }
+      const listener = (event: DeviceMotionEvent) => {
+        const acceleration = event.acceleration;
+        const includingGravity = event.accelerationIncludingGravity;
+        if (acceleration && acceleration.x !== null && acceleration.y !== null && acceleration.z !== null) acceptSample(acceleration.x, acceleration.y, acceleration.z, false, event.timeStamp);
+        else if (includingGravity) acceptSample(includingGravity.x, includingGravity.y, includingGravity.z, true, event.timeStamp);
+      };
+      window.addEventListener('devicemotion', listener);
+      motionRunningRef.current = true;
+      setMotionStatus('CHECKING');
+      setMotionMessage('Checking the phone motion sensors...');
+      const availabilityTimer = setTimeout(() => {
+        if (!sampleSeen) {
+          setMotionStatus('UNAVAILABLE');
+          setMotionMessage('No motion readings are available on this device. GPS and timing will continue.');
+        }
+      }, 2_500);
+      motionCleanupRef.current = () => { clearTimeout(availabilityTimer); window.removeEventListener('devicemotion', listener); };
+    };
+
+    const SensorConstructor = (window as Window & { LinearAccelerationSensor?: LinearSensorConstructor }).LinearAccelerationSensor;
+    if (!SensorConstructor) {
+      await startDeviceMotion();
+      return;
+    }
+    try {
+      const sensor = new SensorConstructor({ frequency: 30 });
+      const reading = () => acceptSample(sensor.x, sensor.y, sensor.z, false, performance.now());
+      const fallback = () => {
+        sensor.stop();
+        if (!sampleSeen) void startDeviceMotion();
+      };
+      sensor.addEventListener('reading', reading);
+      sensor.addEventListener('error', fallback, { once: true });
+      sensor.start();
+      motionRunningRef.current = true;
+      setMotionStatus('CHECKING');
+      setMotionMessage('Checking the phone motion sensors...');
+      const fallbackTimer = setTimeout(() => { if (!sampleSeen) fallback(); }, 2_500);
+      motionCleanupRef.current = () => {
+        clearTimeout(fallbackTimer);
+        sensor.removeEventListener('reading', reading);
+        sensor.removeEventListener('error', fallback);
+        sensor.stop();
+      };
+    } catch {
+      await startDeviceMotion();
+    }
+  }, [persist, stopMotionSensors]);
+
   const stopWatch = useCallback(() => {
     if (watchId.current !== undefined) {
       navigator.geolocation.clearWatch(watchId.current);
@@ -117,6 +373,12 @@ export function ActivityRecorder() {
   }, []);
 
   const beginWatch = useCallback(() => {
+    if (!window.isSecureContext) {
+      setSecureContext('INSECURE');
+      setLocationAccess('INSECURE');
+      setGps('Location is blocked because this phone opened Flinkout over HTTP. Use HTTPS to enable GPS.');
+      return;
+    }
     if (!navigator.geolocation) { setGps('GPS is unavailable in this browser.'); return; }
     if (watchId.current !== undefined) return;
     setGps('Looking for GPS signal...');
@@ -137,14 +399,12 @@ export function ActivityRecorder() {
       };
       const previous = current.route.at(-1);
       if (!shouldKeepPoint(previous, routePoint)) return;
-      persist({
-        ...current,
-        route: [...current.route, routePoint],
-        distanceM: current.distanceM + (previous ? distanceBetween(previous, routePoint) : 0),
-        updatedAt: now(),
-      });
+      const withRoute = { ...current, route: [...current.route, routePoint] };
+      persist(recordGpsSegment(withRoute, previous ? distanceBetween(previous, routePoint) : 0, now()));
+      setLocationAccess('GRANTED');
       setGps(`GPS ready (+/-${Math.round(position.coords.accuracy)} m)`);
     }, error => {
+      if (error.code === error.PERMISSION_DENIED) setLocationAccess('DENIED');
       setGps(error.code === error.PERMISSION_DENIED
         ? 'GPS permission was denied. Enable location access to record a route.'
         : error.code === error.POSITION_UNAVAILABLE
@@ -154,15 +414,20 @@ export function ActivityRecorder() {
   }, [persist]);
 
   useEffect(() => {
-    if (activity?.status === 'RECORDING') beginWatch();
-    else stopWatch();
-  }, [activity?.status, beginWatch, stopWatch]);
+    if (activity?.status === 'RECORDING') {
+      beginWatch();
+      if (!motionRunningRef.current) void beginMotionSensors(activity.type, false);
+    } else {
+      stopWatch();
+      stopMotionSensors();
+    }
+  }, [activity?.clientId, activity?.status, activity?.type, beginMotionSensors, beginWatch, stopMotionSensors, stopWatch]);
 
   async function startLive() {
     const current = activityRef.current;
     const routePoint = current?.route.at(-1);
     if (mode !== 'CONNECTED') {
-      setLiveMessage('Sign in to share live progress with nearby followers.');
+      setLiveMessage('Sign in to share live progress with nearby people.');
       return;
     }
     if (!navigator.onLine) {
@@ -170,16 +435,32 @@ export function ActivityRecorder() {
       return;
     }
     if (!current || !routePoint) {
-      setLiveMessage('GPS needs one accurate point before live sharing can start.');
+      setLiveMessage('Waiting for one accurate GPS point before your live session begins.');
       return;
     }
-    if (livePending) return;
+    if (livePending || current.liveSessionId) return;
     setLivePending(true);
+    setLiveAttempted(true);
     setLiveMessage('Connecting live sharing...');
     try {
-      await api('/live/start', { method: 'POST', body: JSON.stringify({ type: current.type, visibility: 'FOLLOWERS', latitude: routePoint.latitude, longitude: routePoint.longitude, durationS: elapsedSeconds(current), distanceM: current.distanceM }) });
+      const response = await api<{ live: LiveActivity }>('/live/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId: current.clientId,
+          type: current.type,
+          visibility: liveVisibility,
+          latitude: routePoint.latitude,
+          longitude: routePoint.longitude,
+          durationS: elapsedSeconds(current),
+          distanceM: current.distanceM,
+          speedKmh: instantaneousSpeed(current),
+          paused: current.status === 'PAUSED',
+        }),
+      });
       setLive(true);
-      setLiveMessage('Live sharing is on. Only approximate updates are sent every 15 seconds.');
+      setLiveActivity(response.live);
+      persist({ ...current, liveRequested: true, liveSessionId: response.live.id, visibility: liveVisibility, liveEndStatus: null, timeline: response.live.timeline ?? [], updatedAt: now() });
+      setLiveMessage(`You are live with ${liveVisibility === 'PUBLIC' ? 'everyone nearby' : 'your followers'}. Location shown to others is approximate.`);
     } catch {
       setLive(false);
       setLiveMessage('Live sharing could not connect. Your activity is still recording safely on this device.');
@@ -188,14 +469,42 @@ export function ActivityRecorder() {
     }
   }
 
+  useEffect(() => {
+    if (screen === 'LIVE' && activity?.liveRequested && !activity.liveSessionId && activity.status === 'RECORDING' && activity.route.length && !live && !livePending && !liveAttempted && online && mode === 'CONNECTED') void startLive();
+    // startLive intentionally reacts to the persisted recording state rather than function identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activity?.clientId, activity?.liveRequested, activity?.liveSessionId, activity?.route.length, activity?.status, live, liveAttempted, livePending, mode, online, screen]);
+
+  useEffect(() => {
+    const id = activity?.liveSessionId;
+    if (!id || screen !== 'LIVE' || mode !== 'CONNECTED' || !online) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await api<{ live: LiveActivity }>(`/live/${id}`);
+        if (cancelled) return;
+        setLiveActivity(response.live);
+        setLive(Boolean(response.live.active));
+      } catch {
+        if (!cancelled) setLiveMessage('Live audience updates are delayed. Your local recording is still safe.');
+      }
+    };
+    void refresh();
+    const timer = setInterval(refresh, 10_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [activity?.liveSessionId, mode, online, screen]);
+
   async function stopLiveSharing() {
-    if (!live || livePending) return;
+    const current = activityRef.current;
+    if (!current?.liveSessionId || livePending) return;
     setLivePending(true);
     setLiveMessage('Stopping live sharing...');
     try {
-      await api('/live/current', { method: 'DELETE' });
+      const response = await api<{ live: LiveActivity }>('/live/current', { method: 'DELETE' });
       setLive(false);
-      setLiveMessage('Live sharing is off. GPS recording continues only on this device.');
+      setLiveActivity(response.live);
+      persist({ ...current, liveRequested: false, liveEndStatus: 'ENDED', timeline: response.live.timeline ?? current.timeline, updatedAt: now() });
+      setLiveMessage('Live sharing ended. GPS recording continues only on this device.');
     } catch {
       setLiveMessage('We could not confirm that live sharing stopped. Keep this page open and retry.');
     } finally {
@@ -203,12 +512,31 @@ export function ActivityRecorder() {
     }
   }
 
+  function requestLiveNow() {
+    const current = activityRef.current;
+    if (!current) return;
+    setSharingChoice('LIVE');
+    setLiveAttempted(false);
+    persist({ ...current, liveRequested: true, visibility: liveVisibility, updatedAt: now() });
+    setLiveMessage(current.route.length ? 'Starting live sharing...' : 'Waiting for GPS before going live.');
+  }
+
   useEffect(() => {
     const timer = setInterval(() => {
       const current = activityRef.current;
       const routePoint = current?.route.at(-1);
       if (live && current && routePoint && navigator.onLine) {
-        void api('/live/current', { method: 'PUT', body: JSON.stringify({ latitude: routePoint.latitude, longitude: routePoint.longitude, durationS: elapsedSeconds(current), distanceM: current.distanceM }) }).catch(() => setLiveMessage('Live update delayed. GPS recording is still safe on this device.'));
+        void api<{ live: LiveActivity }>('/live/current', {
+          method: 'PUT',
+          body: JSON.stringify({
+            latitude: routePoint.latitude,
+            longitude: routePoint.longitude,
+            durationS: elapsedSeconds(current),
+            distanceM: current.distanceM,
+            speedKmh: instantaneousSpeed(current),
+            paused: current.status === 'PAUSED',
+          }),
+        }).then(response => setLiveActivity(response.live)).catch(() => setLiveMessage('Live update delayed. GPS recording is still safe on this device.'));
       }
     }, 15_000);
     return () => clearInterval(timer);
@@ -225,12 +553,32 @@ export function ActivityRecorder() {
     if (restoring || startPending || storageState !== 'READY') return;
     setStartPending(true);
     setStartError('');
+    // Both permission APIs are invoked before the first await so mobile browsers
+    // still associate their prompts with the user's Start button gesture.
+    const motionPermission = selected === 'RIDE' ? Promise.resolve(true) : requestMotionAccess();
+    const locationPermission = requestLocationAccess();
+    const [motionAllowed] = await Promise.all([motionPermission, locationPermission]);
+    if (!window.isSecureContext) {
+      setStartPending(false);
+      return;
+    }
+    if (selected === 'RIDE' || motionAllowed) void beginMotionSensors(selected, false);
     const time = now();
+    const wantsLive = sharingChoice === 'LIVE' && mode === 'CONNECTED';
+    const seed = locationSeedRef.current;
+    const seedPoint: RoutePoint | undefined = seed && seed.coords.accuracy <= 100 ? {
+      latitude: seed.coords.latitude,
+      longitude: seed.coords.longitude,
+      accuracy: seed.coords.accuracy,
+      altitude: seed.coords.altitude,
+      speed: seed.coords.speed,
+      recordedAt: new Date(seed.timestamp).toISOString(),
+    } : undefined;
     const created: LocalActivity = {
       clientId: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       ownerId: viewer.id,
       type: selected,
-      visibility: 'FOLLOWERS',
+      visibility: wantsLive ? liveVisibility : 'FOLLOWERS',
       status: 'RECORDING',
       published: false,
       syncStatus: 'LOCAL',
@@ -242,7 +590,17 @@ export function ActivityRecorder() {
       elapsedBeforePauseS: 0,
       activeSince: time,
       distanceM: 0,
-      route: [],
+      gpsDistanceM: 0,
+      sensorDistanceM: 0,
+      sensorDistanceOffsetM: 0,
+      steps: 0,
+      distanceSource: seedPoint ? 'GPS' : 'NONE',
+      lastSensorAt: null,
+      route: seedPoint ? [seedPoint] : [],
+      liveRequested: wantsLive,
+      liveSessionId: null,
+      liveEndStatus: null,
+      timeline: [],
       createdAt: time,
       updatedAt: time,
     };
@@ -251,8 +609,11 @@ export function ActivityRecorder() {
       activityRef.current = created;
       setActivity(created);
       setStorageState('READY');
+      setLiveAttempted(false);
+      setLiveMessage(wantsLive ? 'Recording started. Your live session will begin after GPS locks.' : 'Recording only on this device. You can decide whether to share after finishing.');
       setScreen('LIVE');
     } catch {
+      stopMotionSensors();
       activityRef.current = undefined;
       setActivity(undefined);
       setStorageState('ERROR');
@@ -267,37 +628,78 @@ export function ActivityRecorder() {
     if (!current) return;
     if (current.status === 'RECORDING') {
       stopWatch();
+      stopMotionSensors();
       persist({ ...current, status: 'PAUSED', elapsedBeforePauseS: elapsedSeconds(current), activeSince: null, updatedAt: now() });
       setGps('Recording paused.');
+      setMotionMessage('Motion tracking paused.');
     } else {
+      void beginMotionSensors(current.type, true);
       persist({ ...current, status: 'RECORDING', activeSince: now(), updatedAt: now() });
       setGps('Reconnecting to GPS...');
     }
   }
 
-  function finish() {
+  async function finish() {
     const current = activityRef.current;
-    if (!current) return;
+    if (!current || finishing) return;
     if (elapsedSeconds(current) < 30) {
       setShortActivityWarning(true);
       return;
     }
+    setFinishing(true);
     stopWatch();
-    if (live) void api('/live/current', { method: 'DELETE' });
+    stopMotionSensors();
+    const endedAt = now();
+    let finalLive = liveActivity;
+    let liveEndStatus = current.liveSessionId ? current.liveEndStatus ?? 'UNCONFIRMED' as const : null;
+    if (current.liveSessionId && (live || liveActivity?.active !== false)) {
+      try {
+        const response = await api<{ live: LiveActivity }>('/live/current', { method: 'DELETE' });
+        finalLive = response.live;
+        setLiveActivity(response.live);
+        liveEndStatus = 'ENDED';
+      } catch {
+        liveEndStatus = 'UNCONFIRMED';
+      }
+    }
     setLive(false);
     const finished: LocalActivity = {
       ...current,
       status: 'FINISHED',
       published: false,
       syncStatus: 'LOCAL',
-      endedAt: now(),
+      endedAt,
       elapsedBeforePauseS: elapsedSeconds(current),
       activeSince: null,
-      updatedAt: now(),
+      liveRequested: false,
+      liveEndStatus,
+      timeline: completeTimeline(current, finalLive?.timeline, endedAt),
+      updatedAt: endedAt,
     };
     persist(finished);
     setShortActivityWarning(false);
     setScreen('SUMMARY');
+    setFinishing(false);
+  }
+
+  async function postLiveComment(event: React.FormEvent) {
+    event.preventDefault();
+    const current = activityRef.current;
+    const body = liveCommentBody.trim();
+    if (!current?.liveSessionId || !body || liveCommentPending || !live) return;
+    setLiveCommentPending(true);
+    try {
+      await api(`/live/${current.liveSessionId}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+      setLiveCommentBody('');
+      const response = await api<{ live: LiveActivity }>(`/live/${current.liveSessionId}`);
+      setLiveActivity(response.live);
+      persist({ ...current, timeline: response.live.timeline ?? current.timeline, updatedAt: now() });
+      notify('Live update added to the map and timeline.');
+    } catch (cause) {
+      setLiveMessage(cause instanceof Error ? cause.message : 'The live update could not be posted.');
+    } finally {
+      setLiveCommentPending(false);
+    }
   }
 
   async function publish() {
@@ -323,14 +725,17 @@ export function ActivityRecorder() {
       endedAt: current.endedAt,
       durationS: current.elapsedBeforePauseS,
       distanceM: current.distanceM,
+      steps: current.steps ?? 0,
+      distanceSource: current.distanceSource ?? 'NONE',
       route: current.route,
+      timeline: current.timeline,
       user: {
         id: viewer.id,
         username: viewer.username,
         profile: { displayName: viewer.profile?.displayName ?? viewer.username, photoUrl: viewer.profile?.photoUrl ?? null },
       },
-      reactionCount: 0,
-      commentCount: 0,
+      reactionCount: liveActivity?.highFiveCount ?? 0,
+      commentCount: liveActivity?.commentCount ?? 0,
       reactedByViewer: false,
     };
     activityRef.current = published;
@@ -343,6 +748,7 @@ export function ActivityRecorder() {
     }
     postActivity({
       ...feedActivity,
+      id: finalActivity.syncedActivityId ?? feedActivity.id,
       syncedActivityId: finalActivity.syncedActivityId,
       syncStatus: finalActivity.syncStatus,
       syncError: finalActivity.syncError,
@@ -364,62 +770,101 @@ export function ActivityRecorder() {
     if (!current) return;
     if (!window.confirm(current.syncStatus === 'SYNCED' ? 'Remove the local copy? The synchronized online activity will remain available.' : 'Discard this unsynced activity and its locally recorded route?')) return;
     stopWatch();
+    stopMotionSensors();
+    if (current.liveSessionId && (live || liveActivity?.active !== false)) {
+      try {
+        await api('/live/current', { method: 'DELETE' });
+        setLive(false);
+      } catch {
+        setLiveMessage('Discard paused because Flinkout could not confirm that your live location stopped. Retry when connected.');
+        notify('Live sharing must stop before this recording can be discarded.');
+        return;
+      }
+    }
     await deleteActivity(current.clientId);
     setActivity(undefined);
+    setLiveActivity(undefined);
     activityRef.current = undefined;
     setScreen('PICKER');
     setGps('GPS will start when you record.');
     notify(current.syncStatus === 'SYNCED' ? 'Local copy removed. The online activity was not deleted.' : 'Unsynced activity discarded.');
   }
 
-  const seconds = activity ? elapsedSeconds(activity) : elapsed;
+  const seconds = activity ? elapsed : 0;
   const speed = activity ? averageSpeedKmh(activity.distanceM, seconds) : 0;
   const pace = activity ? formatPace(activity.distanceM, seconds) : '-';
+  const liveComments = liveActivity?.comments ?? [];
+  const gpsProblem = gps.includes('denied') || gps.includes('unavailable') || gps.includes('too long');
+  const locationAccessLabel = ({ CHECKING: 'Checking...', PROMPT: 'Permission needed', REQUESTING: 'Waiting for you...', GRANTED: 'Allowed', DENIED: 'Blocked', UNAVAILABLE: 'Unavailable', INSECURE: 'HTTPS required' })[locationAccess];
+  const motionAccessLabel = selected === 'RIDE' ? 'Not needed for ride' : ({ IDLE: 'Permission needed', READY: 'Allowed', CHECKING: 'Waiting for you...', ACTIVE: 'Active', NEEDS_PERMISSION: 'Permission needed', DENIED: 'Blocked', UNAVAILABLE: secureContext === 'INSECURE' ? 'HTTPS required' : 'Unavailable', NOT_USED: 'Not used' })[motionStatus];
 
   if (screen === 'PICKER') return <section className="movement-setup">
     <div className="movement-map-backdrop" />
     <section className="movement-picker card">
-      <header><p className="eyebrow">NEW ACTIVITY</p><h1>What are you doing?</h1><p>Choose a movement. Recording stays on this device even if your connection drops.</p></header>
+      <header><p className="eyebrow">NEW ACTIVITY</p><h1>What are you doing?</h1><p>Choose your movement and whether to record quietly or let nearby people follow along.</p></header>
       <div className="movement-types">{ACTIVITY_TYPES.map(type => <button className={type === selected ? 'selected' : ''} onClick={() => setSelected(type)} key={type} aria-pressed={type === selected}><span><UiIcon name={{ WALK: 'walk', RUN: 'run', RIDE: 'bike', HIKE: 'hike' }[type] as 'walk' | 'run' | 'bike' | 'hike'} size={30} /></span><strong>{labelFor(type)}</strong></button>)}</div>
-      <section className={`daily-goal recording-readiness ${storageState.toLowerCase()}`} aria-live="polite"><div><span>Recording mode</span><p><strong>GPS + offline backup</strong></p></div><b>{startPending ? 'Saving activity…' : restoring ? 'Checking device…' : storageState === 'READY' ? 'Ready to record' : 'Storage unavailable'}</b><i><span /></i></section>
+      <section className="activity-sharing-choice" aria-labelledby="sharing-choice-title">
+        <div><p className="eyebrow">SHARING MODE</p><h2 id="sharing-choice-title">How do you want to start?</h2></div>
+        <div>
+          <button className={sharingChoice === 'RECORD_ONLY' ? 'selected' : ''} aria-pressed={sharingChoice === 'RECORD_ONLY'} onClick={() => setSharingChoice('RECORD_ONLY')}><UiIcon name="lock" /><span><strong>Record only</strong><small>No live location. Choose whether to share after your review.</small></span></button>
+          <button className={sharingChoice === 'LIVE' ? 'selected live' : 'live'} aria-pressed={sharingChoice === 'LIVE'} disabled={mode !== 'CONNECTED'} onClick={() => setSharingChoice('LIVE')}><UiIcon name="radio" /><span><strong>Go live</strong><small>{mode === 'CHECKING' ? 'Checking your account...' : mode === 'CONNECTED' ? 'Nearby people can follow progress, comment, join, and high-five.' : 'Sign in to use live sharing.'}</small></span></button>
+        </div>
+        {sharingChoice === 'LIVE' && <label className="live-audience-field">Live audience<select value={liveVisibility} onChange={event => setLiveVisibility(event.target.value as 'FOLLOWERS' | 'PUBLIC')}><option value="FOLLOWERS">Followers nearby</option><option value="PUBLIC">Everyone nearby</option></select><small>Your map marker is approximate, and you can stop sharing while recording.</small></label>}
+      </section>
+      <section className={`device-access-card ${secureContext === 'INSECURE' ? 'blocked' : ''}`} aria-labelledby="device-access-title">
+        <header><div><p className="eyebrow">DEVICE ACCESS</p><h2 id="device-access-title">Allow activity tracking</h2></div><small>Requested only when you choose</small></header>
+        <div className="device-access-row"><UiIcon name="location" size={20} /><span><strong>Location</strong><small>Records your route, distance, and live position.</small></span><b className={locationAccess.toLowerCase()}>{locationAccessLabel}</b>{locationAccess !== 'GRANTED' && locationAccess !== 'REQUESTING' && secureContext !== 'INSECURE' && <button onClick={() => void requestLocationAccess()}>{locationAccess === 'DENIED' ? 'Try again' : 'Allow'}</button>}</div>
+        <div className="device-access-row"><UiIcon name="activity" size={20} /><span><strong>Motion sensors</strong><small>{selected === 'RIDE' ? 'Ride distance stays GPS-based to avoid sensor drift.' : 'Counts steps and estimates distance if GPS drops.'}</small></span><b className={motionStatus.toLowerCase()}>{motionAccessLabel}</b>{selected !== 'RIDE' && motionStatus !== 'READY' && motionStatus !== 'ACTIVE' && motionStatus !== 'CHECKING' && secureContext !== 'INSECURE' && <button onClick={() => void requestMotionAccess()}>{motionStatus === 'DENIED' ? 'Try again' : 'Allow'}</button>}</div>
+        {secureContext === 'INSECURE' && <p className="device-access-warning" role="alert"><UiIcon name="shield" size={18} /><span><strong>HTTPS is required on phones</strong>Mobile browsers block GPS and motion prompts on an HTTP network address. Open the HTTPS version of Flinkout and try again.</span></p>}
+      </section>
+      <section className={`daily-goal recording-readiness ${storageState.toLowerCase()}`} aria-live="polite"><div><span>Recording safety</span><p><strong>GPS + motion sensors + offline backup</strong></p></div><b>{startPending ? 'Requesting access...' : restoring ? 'Checking device...' : secureContext === 'INSECURE' ? 'HTTPS required' : storageState === 'READY' ? 'Ready to record' : 'Storage unavailable'}</b><i><span /></i></section>
       {startError && <p className="recording-start-error" role="alert"><UiIcon name="shield" size={18} />{startError}</p>}
-      <p className="recording-privacy-note"><UiIcon name="shield" size={18} /> Live sharing becomes available after you start and GPS finds your location.</p>
-      <button className="start-movement-button" onClick={() => void (storageState === 'ERROR' ? checkStorage() : start())} disabled={restoring || startPending}><UiIcon name={storageState === 'ERROR' ? 'shield' : 'play'} />{startPending ? 'Starting safely…' : restoring ? 'Checking device…' : storageState === 'ERROR' ? 'Retry device check' : `Start ${labelFor(selected).toLowerCase()}`} <span>{storageState === 'ERROR' ? 'Retry' : 'Go'}</span></button>
+      <p className="recording-privacy-note"><UiIcon name="shield" size={18} /> {sharingChoice === 'LIVE' ? 'Live starts only after an accurate GPS lock. Motion data stays on-device; only summary steps and distance are saved.' : 'Nothing is posted automatically. Available motion sensors can keep estimating steps and distance if GPS fails.'}</p>
+      <button className="start-movement-button" onClick={() => void (storageState === 'ERROR' ? checkStorage() : start())} disabled={restoring || startPending || secureContext === 'INSECURE' || (sharingChoice === 'LIVE' && mode !== 'CONNECTED')}><UiIcon name={storageState === 'ERROR' || secureContext === 'INSECURE' ? 'shield' : sharingChoice === 'LIVE' ? 'radio' : 'play'} />{startPending ? 'Requesting device access...' : restoring ? 'Checking device...' : secureContext === 'INSECURE' ? 'Open Flinkout over HTTPS' : storageState === 'ERROR' ? 'Retry device check' : `Allow access & start ${labelFor(selected).toLowerCase()}${sharingChoice === 'LIVE' ? ' live' : ''}`} <span>{secureContext === 'INSECURE' ? 'Required' : storageState === 'ERROR' ? 'Retry' : 'Go'}</span></button>
     </section>
   </section>;
 
   if (!activity) return null;
   if (screen === 'SUMMARY') return <section className="record-shell stack">
     <div className="hero activity-review-heading"><span className="review-complete-icon"><UiIcon name="highfive" /></span><div><p>Activity complete</p><h1>Review your {labelFor(activity.type).toLowerCase()}</h1><small className="summary-date">{new Date(activity.startedAt).toLocaleString()}</small></div></div>
-    {activity.route.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state"><UiIcon name="map" size={30} /><strong>No route recorded</strong><span>Your time is still saved. Enable location before your next activity to include a route.</span></div>}
+    {activity.route.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state"><UiIcon name="map" size={30} /><strong>No GPS route recorded</strong><span>{activity.steps ? `${activity.steps.toLocaleString()} steps and ${formatDistance(activity.distanceM)} of motion-estimated distance were still saved.` : 'Your time is still saved. Enable location and motion access before your next activity for richer metrics.'}</span></div>}
     <Metrics activity={activity} seconds={seconds} speed={speed} pace={pace} />
+    {activity.liveSessionId && <section className={`card live-recap-card ${activity.liveEndStatus === 'UNCONFIRMED' ? 'warning' : ''}`}><UiIcon name={activity.liveEndStatus === 'UNCONFIRMED' ? 'shield' : 'radio'} /><div><strong>{activity.liveEndStatus === 'UNCONFIRMED' ? 'Live stop is not confirmed' : 'Live session ended'}</strong><span>{activity.liveEndStatus === 'UNCONFIRMED' ? 'Your recording is safe, but reconnect before discarding so Flinkout can confirm the broadcast ended.' : `${liveActivity?.joinCount ?? 0} joined - ${liveActivity?.highFiveCount ?? 0} high-fives - ${liveActivity?.commentCount ?? 0} live updates saved to the timeline.`}</span></div></section>}
     <section className="card stack activity-publish-card">
-      <div><p className="eyebrow">FINAL STEP</p><h2>Choose who can see it</h2><p>{activity.route.length ? 'Review your route and metrics before publishing.' : 'No GPS route was captured. Only the activity type and time will be included.'}</p></div>
+      <div><p className="eyebrow">FINAL STEP</p><h2>Choose who can see it</h2><p>{activity.route.length ? 'Review your route, metrics, and live timeline before publishing.' : activity.steps ? 'No GPS route was captured. Your step count and estimated distance can still be included.' : 'No GPS route or motion steps were captured. Your activity type and time are still saved.'}</p></div>
       <label className="field">Who can see this activity?<select value={activity.visibility} onChange={event => persist({ ...activity, visibility: event.target.value as LocalActivity['visibility'], updatedAt: now() })}><option value="FOLLOWERS">Followers</option><option value="PUBLIC">Everyone</option><option value="PRIVATE">Only me</option></select></label>
-      <p className="local-save-status"><UiIcon name="bookmark" size={18} /> Saved safely on this device · not published yet</p>
-      <div className="summary-actions"><button className="button post-activity-button" onClick={() => void publish()} disabled={posting}><UiIcon name={activity.visibility === 'PRIVATE' ? 'lock' : 'share'} />{posting ? 'Publishing…' : activity.visibility === 'PRIVATE' ? 'Save privately' : 'Post activity'}</button><button className="button discard-activity-button" onClick={discard} disabled={posting}>Discard</button></div>
+      <p className="local-save-status"><UiIcon name="bookmark" size={18} /> Saved safely on this device - not published yet</p>
+      <div className="summary-actions"><button className="button post-activity-button" onClick={() => void publish()} disabled={posting}><UiIcon name={activity.visibility === 'PRIVATE' ? 'lock' : 'share'} />{posting ? 'Publishing...' : activity.visibility === 'PRIVATE' ? 'Save privately' : 'Post activity'}</button><button className="button discard-activity-button" onClick={() => void discard()} disabled={posting}>Discard</button></div>
     </section>
   </section>;
 
   return <section className="live-tracking-screen">
     <div className="live-tracking-map">
-      {activity.route.length ? <RouteMap points={activity.route} /> : <div className="recording-route-placeholder"><UiIcon name="location" size={30} /><span>Finding your location…</span></div>}
-      <span className={`live-session-chip ${live ? 'sharing' : ''}`}><i /> {live ? 'Live sharing' : activity.status === 'PAUSED' ? 'Recording paused' : 'Recording locally'} - {labelFor(activity.type)}</span>
-      <section className="recording-map-status"><span>{online ? 'Online' : 'Offline safe'}</span><span>{activity.route.length ? `${activity.route.length} GPS samples` : 'Waiting for GPS'}</span></section>
+      {activity.route.length ? <RouteMap points={activity.route} /> : <div className="recording-route-placeholder"><UiIcon name="location" size={30} /><span>{activity.steps ? `No GPS route - ${activity.steps.toLocaleString()} steps detected` : 'Finding your location...'}</span></div>}
+      <span className={`live-session-chip ${live ? 'sharing' : ''}`}><i /> {live ? 'Live now' : activity.status === 'PAUSED' ? 'Recording paused' : activity.liveRequested ? 'Waiting to go live' : 'Recording only'} - {labelFor(activity.type)}</span>
+      <section className="recording-map-status"><span>{online ? 'Online' : 'Offline safe'}</span><span>{distanceSourceLabel(activity)}</span><span>{activity.route.length ? `${activity.route.length} GPS samples` : 'Waiting for GPS'}</span>{liveActivity?.latestComment && <span className="map-live-notification">{liveActivity.latestComment.user.displayName}: {liveActivity.latestComment.body}</span>}</section>
     </div>
     <section className="live-metrics-panel">
       <div className="live-primary-metrics"><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
-      <div className="live-secondary-metrics"><span><small>GPS samples</small><strong>{activity.route.length}</strong></span><span><small>Connection</small><strong>{online ? 'Online' : 'Offline safe'}</strong></span></div>
-      <p className={`status ${gps.includes('denied') || gps.includes('unavailable') ? 'warning' : ''}`} role="status">{gps}{gps.includes('denied') || gps.includes('unavailable') ? ' Timing continues, so you can finish and post without a route.' : ''}</p>
+      <div className="live-secondary-metrics"><span><small>Steps</small><strong>{activity.type === 'RIDE' ? '-' : (activity.steps ?? 0).toLocaleString()}</strong></span><span><small>GPS samples</small><strong>{activity.route.length}</strong></span><span><small>{live ? 'Live audience' : 'Source'}</small><strong>{live ? `${liveActivity?.joinCount ?? 0} joined` : distanceSourceLabel(activity)}</strong></span></div>
+      <p className={`status ${gpsProblem ? 'warning' : ''}`} role="status">{gps}{gpsProblem ? motionStatus === 'ACTIVE' && activity.type !== 'RIDE' ? ' Motion sensors are continuing steps and estimated distance.' : ' Timing continues, but distance may be unavailable.' : ''}</p>
+      <p className={`status motion-status ${motionStatus === 'DENIED' || motionStatus === 'UNAVAILABLE' ? 'warning' : ''}`} role="status">{motionMessage}</p>
+      {(motionStatus === 'NEEDS_PERMISSION' || motionStatus === 'DENIED') && activity.type !== 'RIDE' && <button className="enable-motion-button" onClick={() => void beginMotionSensors(activity.type, true)}>Enable motion sensors</button>}
       {liveMessage && <p className={`hint live-sharing-message ${livePending ? 'pending' : ''}`} role="status">{liveMessage}</p>}
+      {liveAttempted && !live && activity.liveRequested && !activity.liveSessionId && <button className="retry-live-button" onClick={() => { setLiveAttempted(false); setLiveMessage('Retrying live sharing...'); }} disabled={!online || livePending}>Retry live sharing</button>}
+      {liveActivity && <section className="recording-community-panel">
+        <header><div><span className="live-pulse" /><strong>{live ? 'Live community' : 'Live recap'}</strong></div><small>{liveActivity.highFiveCount ?? 0} high-fives - {liveActivity.commentCount ?? 0} updates</small></header>
+        {liveComments.length ? <div className="recording-live-comments">{liveComments.slice(-3).reverse().map(comment => <article key={comment.id}><span className="avatar small">{comment.user.displayName[0]}</span><p><strong>{comment.user.displayName}</strong>{comment.body}<small>{new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - pinned to the approximate live location</small></p></article>)}</div> : <p className="recording-community-empty">Comments and nearby updates will appear here and in the activity timeline.</p>}
+        {live && <form onSubmit={postLiveComment}><label className="sr-only" htmlFor="live-comment">Share a nearby update</label><input id="live-comment" value={liveCommentBody} onChange={event => setLiveCommentBody(event.target.value)} maxLength={500} placeholder="Share a trail, traffic, or nearby update..." /><button disabled={liveCommentPending || !liveCommentBody.trim()} aria-label="Post live update"><UiIcon name="send" size={18} /></button></form>}
+      </section>}
       {shortActivityWarning && <div className="short-activity-warning" role="alert"><strong>Keep moving a little longer</strong><span>An activity needs at least 30 seconds before it can be reviewed and posted.</span><div><button onClick={() => setShortActivityWarning(false)}>Keep recording</button><button onClick={() => void discard()}>Discard activity</button></div></div>}
-      <div className="live-controls"><button onClick={pauseResume}><UiIcon name={activity.status === 'PAUSED' ? 'play' : 'pause'} />{activity.status === 'PAUSED' ? 'Resume' : 'Pause'}</button><button onClick={finish}><UiIcon name="stop" />Finish &amp; review</button></div>
-      {activity.route.length ? <button className={`live-share-control ${live ? 'active' : ''}`} disabled={livePending || (!live && (mode !== 'CONNECTED' || !online))} onClick={() => void (live ? stopLiveSharing() : startLive())}>{livePending ? (live ? 'Stopping…' : 'Connecting…') : live ? 'Stop live sharing' : mode === 'CONNECTED' ? 'Share this activity live' : 'Sign in to share live'}</button> : <p className="live-share-unavailable"><UiIcon name="radio" size={17} /> Live sharing will appear after GPS locks.</p>}
+      <div className="live-controls"><button onClick={pauseResume} disabled={finishing}><UiIcon name={activity.status === 'PAUSED' ? 'play' : 'pause'} />{activity.status === 'PAUSED' ? 'Resume' : 'Pause'}</button><button onClick={() => void finish()} disabled={finishing}><UiIcon name="stop" />{finishing ? 'Ending...' : 'Finish & review'}</button></div>
+      {activity.liveSessionId && !live ? <p className="live-share-unavailable"><UiIcon name="shield" size={17} /> Live sharing has ended for this activity. Recording remains local.</p> : activity.route.length ? <button className={`live-share-control ${live ? 'active' : ''}`} disabled={livePending || (!live && (mode !== 'CONNECTED' || !online))} onClick={() => void (live ? stopLiveSharing() : requestLiveNow())}>{livePending ? (live ? 'Stopping...' : 'Connecting...') : live ? 'Stop live sharing' : mode === 'CONNECTED' ? 'Share this activity live' : 'Sign in to share live'}</button> : <p className="live-share-unavailable"><UiIcon name="radio" size={17} /> {activity.liveRequested ? 'Live sharing will begin after GPS locks.' : 'Live sharing becomes available after GPS locks.'}</p>}
     </section>
   </section>;
 }
 
 function Metrics({ activity, seconds, speed, pace }: { activity: LocalActivity; seconds: number; speed: number; pace: string }) {
   const paceActivity = activity.type === 'WALK' || activity.type === 'RUN' || activity.type === 'HIKE';
-  return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? 'Average pace' : 'Average speed'}</span></div><div className="metric"><strong>{activity.route.length}</strong><span>GPS samples</span></div></section>;
+  return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance - {distanceSourceLabel(activity)}</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? 'Average pace' : 'Average speed'}</span></div><div className="metric"><strong>{paceActivity ? (activity.steps ?? 0).toLocaleString() : activity.route.length}</strong><span>{paceActivity ? 'Steps' : 'GPS samples'}</span></div></section>;
 }
