@@ -2,15 +2,38 @@
   "name": "flinkout",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*"],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w @flinkout/api\" \"npm run dev -w @flinkout/web\"",
-    "build": "npm run build -w @flinkout/api && npm run build -w @flinkout/web",
-    "test": "npm run test -w @flinkout/api && npm run test -w @flinkout/web",
-    "db:generate": "npm run db:generate -w @flinkout/api",
-    "db:migrate": "npm run db:migrate -w @flinkout/api"
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "build:hostinger": "prisma generate && prisma migrate deploy && next build",
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy"
+  },
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.7.0",
+    "bcryptjs": "^3.0.2",
+    "leaflet": "^1.9.4",
+    "next": "^16.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-leaflet": "^5.0.0",
+    "server-only": "^0.0.1",
+    "zod": "^3.24.3"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@types/leaflet": "^1.9.16",
+    "@types/node": "^22.15.3",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "prisma": "^6.7.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.3"
   }
 }
