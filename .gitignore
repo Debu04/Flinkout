@@ -5,4 +5,5 @@ coverage/
 .env
 .env.local
 *.log
-apps/api/prisma/dev.db
+*.tsbuildinfo
+prisma/dev.db
