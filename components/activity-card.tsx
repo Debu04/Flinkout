@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { api, type SocialActivity } from '../lib/api';
-import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
+import { averageSpeedKmh, formatDistance, formatDuration, formatPaceSeconds, labelFor } from '../lib/activity';
 import { syncActivity } from '../lib/activity-sync';
 import { getDemoActivity } from '../lib/demo-data';
 import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
@@ -65,7 +65,9 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
   const saved = state.savedActivityIds.includes(activity.id);
   const hidden = state.hiddenActivityIds.includes(activity.id);
   const paceType = activity.type !== 'RIDE';
-  const metric = paceType ? formatPace(activity.distanceM, activity.durationS) : `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h`;
+  const movingTimeS = activity.movingTimeS || activity.durationS;
+  const averagePaceSPerKm = activity.averagePaceSPerKm ?? (activity.distanceM > 0 ? movingTimeS / (activity.distanceM / 1000) : null);
+  const metric = paceType ? formatPaceSeconds(averagePaceSPerKm) : `${averageSpeedKmh(activity.distanceM, movingTimeS).toFixed(1)} km/h`;
   const content = contentFor(activity);
 
   async function toggleReaction() {
@@ -146,7 +148,7 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
       <div className="activity-metrics">
         <span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span>
         <span><small>Time</small><strong>{formatDuration(activity.durationS)}</strong></span>
-        <span><small>{paceType ? 'Pace' : 'Speed'}</small><strong>{metric}</strong></span>
+        <span><small>{paceType ? 'Avg pace' : 'Avg speed'}</small><strong>{metric}</strong></span>
       </div>
       <Link className="route-play" href={`/activities/${activity.id}`} aria-label="Replay activity"><UiIcon name="play" size={26} /></Link>
     </div>
