@@ -134,25 +134,31 @@ model ActivityHeatCell {
 }
 
 model Activity {
-  id             String             @id @default(cuid())
-  userId         String             @map("user_id")
-  clientId       String             @map("client_id") @db.Char(36)
-  type           ActivityType
-  visibility     ActivityVisibility @default(PRIVATE)
-  startedAt      DateTime           @map("started_at")
-  endedAt        DateTime?          @map("ended_at")
-  durationS      Int                @default(0) @map("duration_s")
-  distanceM      Int                @default(0) @map("distance_m")
-  steps          Int                @default(0)
-  distanceSource String             @default("NONE") @map("distance_source") @db.VarChar(16)
-  startLat       Float?             @map("start_lat")
-  startLng       Float?             @map("start_lng")
-  route          Json?
-  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reactions      ActivityReaction[]
-  comments       ActivityComment[]
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
+  id                String             @id @default(cuid())
+  userId            String             @map("user_id")
+  clientId          String             @map("client_id") @db.Char(36)
+  type              ActivityType
+  visibility        ActivityVisibility @default(PRIVATE)
+  startedAt         DateTime           @map("started_at")
+  endedAt           DateTime?          @map("ended_at")
+  durationS         Int                @default(0) @map("duration_s")
+  movingTimeS       Int                @default(0) @map("moving_time_s")
+  distanceM         Int                @default(0) @map("distance_m")
+  steps             Int                @default(0)
+  averagePaceSPerKm Float?             @map("average_pace_s_per_km")
+  caloriesKcal      Float              @default(0) @map("calories_kcal")
+  currentElevationM Float?             @map("current_elevation_m")
+  elevationGainM    Float              @default(0) @map("elevation_gain_m")
+  elevationLossM    Float              @default(0) @map("elevation_loss_m")
+  distanceSource    String             @default("NONE") @map("distance_source") @db.VarChar(16)
+  startLat          Float?             @map("start_lat")
+  startLng          Float?             @map("start_lng")
+  route             Json?
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactions         ActivityReaction[]
+  comments          ActivityComment[]
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
 
   @@unique([userId, clientId])
   @@index([userId, startedAt])

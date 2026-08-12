@@ -7,8 +7,63 @@ export type ActivityVisibility = typeof VISIBILITIES[number];
 export type RecordingStatus = 'RECORDING' | 'PAUSED' | 'FINISHED';
 export type SyncStatus = 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 export type DistanceSource = 'GPS' | 'MOTION' | 'FUSED' | 'NONE';
-export type RoutePoint = { latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; recordedAt: string };
-export type LocalActivity = { clientId: string; ownerId?: string; type: ActivityType; visibility: ActivityVisibility; status: RecordingStatus; published: boolean; syncStatus: SyncStatus; syncError: string | null; syncedActivityId: string | null; lastSyncAttemptAt: string | null; startedAt: string; endedAt: string | null; elapsedBeforePauseS: number; activeSince: string | null; distanceM: number; gpsDistanceM?: number; sensorDistanceM?: number; sensorDistanceOffsetM?: number; steps?: number; strideM?: number; distanceSource?: DistanceSource; lastSensorAt?: string | null; route: RoutePoint[]; liveRequested?: boolean; liveSessionId?: string | null; liveEndStatus?: 'ENDED' | 'UNCONFIRMED' | null; timeline?: ActivityTimelineEvent[]; createdAt: string; updatedAt: string };
+export type TrackingMode = 'GPS_MOTION' | 'MOTION_ONLY' | 'PAUSED';
+export type PaceSource = 'GPS' | 'MOTION_ESTIMATED';
+export type RoutePoint = {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  altitude: number | null;
+  altitudeAccuracy?: number | null;
+  speed: number | null;
+  recordedAt: string;
+};
+export type LocalActivity = {
+  clientId: string;
+  ownerId?: string;
+  type: ActivityType;
+  visibility: ActivityVisibility;
+  status: RecordingStatus;
+  published: boolean;
+  syncStatus: SyncStatus;
+  syncError: string | null;
+  syncedActivityId: string | null;
+  lastSyncAttemptAt: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  elapsedBeforePauseS: number;
+  activeSince: string | null;
+  movingTimeS?: number;
+  lastMovementAt?: string | null;
+  distanceM: number;
+  gpsDistanceM?: number;
+  sensorDistanceM?: number;
+  sensorDistanceOffsetM?: number;
+  steps?: number;
+  cadenceSpm?: number;
+  strideM?: number;
+  distanceSource?: DistanceSource;
+  currentPaceSPerKm?: number | null;
+  averagePaceSPerKm?: number | null;
+  paceSource?: PaceSource | null;
+  caloriesKcal?: number;
+  currentElevationM?: number | null;
+  elevationReferenceM?: number | null;
+  elevationGainM?: number;
+  elevationLossM?: number;
+  trackingMode?: TrackingMode;
+  gpsAvailable?: boolean;
+  gpsAccuracyM?: number | null;
+  lastReliableGpsAt?: string | null;
+  lastSensorAt?: string | null;
+  route: RoutePoint[];
+  liveRequested?: boolean;
+  liveSessionId?: string | null;
+  liveEndStatus?: 'ENDED' | 'UNCONFIRMED' | null;
+  timeline?: ActivityTimelineEvent[];
+  createdAt: string;
+  updatedAt: string;
+};
 
 const earthRadiusM = 6_371_000;
 const radians = (degrees: number) => degrees * Math.PI / 180;
@@ -31,5 +86,12 @@ export function elapsedSeconds(activity: LocalActivity, now = Date.now()) {
 export function formatDuration(seconds: number) { const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); const s = seconds % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; }
 export function formatDistance(meters: number) { return `${(meters / 1000).toFixed(meters < 1000 ? 2 : 1)} km`; }
 export function averageSpeedKmh(distanceM: number, seconds: number) { return seconds ? distanceM / seconds * 3.6 : 0; }
-export function formatPace(distanceM: number, seconds: number) { if (!distanceM || !seconds) return '—'; const s = Math.round(seconds / (distanceM / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} /km`; }
+export function formatPaceSeconds(secondsPerKm: number | null | undefined) {
+  if (!secondsPerKm || !Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return '--';
+  const seconds = Math.round(secondsPerKm);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} /km`;
+}
+export function formatPace(distanceM: number, seconds: number) {
+  return formatPaceSeconds(distanceM > 0 && seconds > 0 ? seconds / (distanceM / 1000) : null);
+}
 export function labelFor(type: ActivityType) { return ({ WALK: 'Walk', RUN: 'Run', RIDE: 'Ride', HIKE: 'Hike' })[type]; }

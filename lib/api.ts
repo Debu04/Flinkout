@@ -1,7 +1,7 @@
 export type Profile = { displayName: string; bio: string | null; photoUrl: string | null; profileVisibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE'; routeVisibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE'; discoverable: boolean };
 export type User = { id: string; email?: string; username: string; profile: Profile | null; isFollowing?: boolean; isSelf?: boolean };
 export type SocialUser = { id: string; username: string; profile: { displayName: string; photoUrl: string | null } | null };
-export type ActivityPoint = { latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; recordedAt: string };
+export type ActivityPoint = { latitude: number; longitude: number; accuracy: number | null; altitude: number | null; altitudeAccuracy?: number | null; speed: number | null; recordedAt: string };
 export type TimelineUser = { id: string; username: string; displayName: string; photoUrl: string | null };
 export type ActivityTimelineEvent = {
   id: string;
@@ -24,8 +24,14 @@ export type SocialActivity = {
   startedAt: string;
   endedAt: string | null;
   durationS: number;
+  movingTimeS?: number;
   distanceM: number;
   steps?: number;
+  averagePaceSPerKm?: number | null;
+  caloriesKcal?: number;
+  currentElevationM?: number | null;
+  elevationGainM?: number;
+  elevationLossM?: number;
   distanceSource?: 'GPS' | 'MOTION' | 'FUSED' | 'NONE';
   route: ActivityPoint[] | null;
   user: SocialUser;

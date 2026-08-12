@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type ActivityTimelineEvent, type Comment, type SocialActivity } from '../lib/api';
-import { averageSpeedKmh, formatDistance, formatDuration, formatPace, labelFor } from '../lib/activity';
+import { averageSpeedKmh, formatDistance, formatDuration, formatPaceSeconds, labelFor } from '../lib/activity';
 import { getDemoActivity } from '../lib/demo-data';
 import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
@@ -130,7 +130,9 @@ export function ActivityDetail({ id }: { id: string }) {
     elevationM: 0,
   };
   const displayReactionCount = activity.reactionCount + (isPreview ? Number(reacted) - Number(activity.reactedByViewer) : 0);
-  const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h` : formatPace(activity.distanceM, activity.durationS);
+  const movingTimeS = activity.movingTimeS || activity.durationS;
+  const averagePaceSPerKm = activity.averagePaceSPerKm ?? (activity.distanceM > 0 ? movingTimeS / (activity.distanceM / 1000) : null);
+  const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, movingTimeS).toFixed(1)} km/h` : formatPaceSeconds(averagePaceSPerKm);
   const timeline: ActivityTimelineEvent[] = activity.timeline?.length ? activity.timeline : [
     { id: `${activity.id}-start`, type: 'START', source: 'ACTIVITY', createdAt: activity.startedAt },
     ...(activity.endedAt ? [{ id: `${activity.id}-finish`, type: 'FINISH' as const, source: 'ACTIVITY' as const, createdAt: activity.endedAt }] : []),
@@ -160,6 +162,6 @@ export function ActivityDetail({ id }: { id: string }) {
         {error && <p className="error" role="alert">{error}</p>}
       </aside>
     </div>
-    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{speedMetric}</strong></span><span><small>{activity.type === 'RIDE' ? 'GPS samples' : 'Steps'}</small><strong>{activity.type === 'RIDE' ? activity.route?.length ?? 0 : (activity.steps ?? 0).toLocaleString()}</strong></span></div></section>
+    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Average speed' : 'Average pace'}</small><strong>{speedMetric}</strong></span><span><small>{activity.type === 'RIDE' ? 'Calories' : 'Steps'}</small><strong>{activity.type === 'RIDE' ? `${Math.round(activity.caloriesKcal ?? 0)} kcal` : (activity.steps ?? 0).toLocaleString()}</strong></span></div></section>
   </section>;
 }

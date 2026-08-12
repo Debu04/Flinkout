@@ -10,8 +10,14 @@ const activity = {
   startedAt: '2026-07-20T10:00:00.000Z',
   endedAt: '2026-07-20T10:05:00.000Z',
   durationS: 300,
+  movingTimeS: 285,
   distanceM: 1000,
   steps: 1150,
+  averagePaceSPerKm: 285,
+  caloriesKcal: 52.4,
+  currentElevationM: 124.3,
+  elevationGainM: 18.2,
+  elevationLossM: 4.6,
   distanceSource: 'FUSED',
   route: [{
     latitude: 20.5937,
@@ -26,9 +32,9 @@ const activity = {
 describe('activity sync API contract', () => {
   it('accepts complete and legacy local activity payloads', () => {
     expect(syncActivitySchema.safeParse(activity).success).toBe(true);
-    const legacy = syncActivitySchema.safeParse({ ...activity, steps: undefined, distanceSource: undefined });
+    const legacy = syncActivitySchema.safeParse({ ...activity, steps: undefined, movingTimeS: undefined, averagePaceSPerKm: undefined, caloriesKcal: undefined, currentElevationM: undefined, elevationGainM: undefined, elevationLossM: undefined, distanceSource: undefined });
     expect(legacy.success).toBe(true);
-    if (legacy.success) expect(legacy.data).toMatchObject({ steps: 0, distanceSource: 'NONE' });
+    if (legacy.success) expect(legacy.data).toMatchObject({ steps: 0, movingTimeS: 0, averagePaceSPerKm: null, caloriesKcal: 0, currentElevationM: null, elevationGainM: 0, elevationLossM: 0, distanceSource: 'NONE' });
   });
 
   it('rejects malformed coordinates, reversed times, and oversized routes', () => {
