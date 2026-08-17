@@ -888,12 +888,14 @@ export function ActivityRecorder() {
 
   const seconds = activity ? elapsed : 0;
   const speed = activity ? averageSpeedKmh(activity.distanceM, activity.movingTimeS ?? 0) : 0;
-  const currentPaceFresh = activity?.lastMovementAt && Date.now() - Date.parse(activity.lastMovementAt) <= 12_000;
-  const pace = formatPaceSeconds(currentPaceFresh ? activity?.currentPaceSPerKm : null);
+  // The live value is the cumulative average. It remains readable between GPS
+  // updates instead of blinking as an instantaneous sample becomes stale.
+  const pace = formatPaceSeconds(activity?.averagePaceSPerKm ?? activity?.currentPaceSPerKm);
   const averagePace = formatPaceSeconds(activity?.averagePaceSPerKm);
+  const elevationGainM = Math.min(activity?.elevationGainM ?? 0, (activity?.distanceM ?? 0) * 0.45);
   const elevation = activity?.currentElevationM === null || activity?.currentElevationM === undefined
     ? '--'
-    : `${Math.round(activity.currentElevationM)} m${(activity.elevationGainM ?? 0) >= 1 ? ` ↑${Math.round(activity.elevationGainM ?? 0)}` : ''}`;
+    : `${activity.distanceM < 50 ? 0 : Math.max(0, Math.round(elevationGainM))} m`;
   const liveComments = liveActivity?.comments ?? [];
   const gpsProblem = /denied|unavailable|too long|blocked|weak/i.test(gps);
   const accessNoteState = secureContext === 'INSECURE' ? 'insecure' : storageState === 'ERROR' ? 'error' : locationAccess === 'DENIED' ? 'denied' : restoring || startPending ? 'checking' : 'ready';
