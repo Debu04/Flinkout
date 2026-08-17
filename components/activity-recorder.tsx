@@ -8,6 +8,7 @@ import { detectStep, distanceSourceLabel, initialStepDetectorState, markGpsUnava
 import { deleteActivity, getIncompleteActivity, putActivity } from '../lib/activity-db';
 import { syncActivity, syncPendingActivities } from '../lib/activity-sync';
 import { api, type ActivityTimelineEvent, type LiveActivity, type SocialActivity } from '../lib/api';
+import { FlinkoutStepCounter, hasNativeStepCounterBridge, type NativeStepReading } from '../lib/native-step-counter';
 import { useAppSession, useInteractions, usePreviewState } from './interaction-provider';
 import { UiIcon } from './ui-icon';
 
@@ -15,6 +16,7 @@ const RouteMap = dynamic(() => import('./route-map').then(module => module.Route
 type Screen = 'PICKER' | 'LIVE' | 'SUMMARY';
 type SharingChoice = 'RECORD_ONLY' | 'LIVE';
 type MotionStatus = 'IDLE' | 'READY' | 'CHECKING' | 'ACTIVE' | 'NEEDS_PERMISSION' | 'DENIED' | 'UNAVAILABLE' | 'NOT_USED';
+type MotionSource = 'NONE' | 'NATIVE' | 'BROWSER_ESTIMATED';
 type DeviceAccessState = 'CHECKING' | 'PROMPT' | 'REQUESTING' | 'GRANTED' | 'DENIED' | 'UNAVAILABLE' | 'INSECURE';
 type MotionPermissionConstructor = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 type LinearSensor = EventTarget & { x: number | null; y: number | null; z: number | null; start: () => void; stop: () => void };
@@ -69,6 +71,7 @@ export function ActivityRecorder() {
   const [secureContext, setSecureContext] = useState<'CHECKING' | 'SECURE' | 'INSECURE'>('CHECKING');
   const [locationAccess, setLocationAccess] = useState<DeviceAccessState>('CHECKING');
   const [motionStatus, setMotionStatus] = useState<MotionStatus>('IDLE');
+  const [motionSource, setMotionSource] = useState<MotionSource>('NONE');
   const [motionMessage, setMotionMessage] = useState('Motion sensors will be checked when you start.');
   const [mapPosition, setMapPosition] = useState<RoutePoint>();
   const [online, setOnline] = useState(true);
@@ -98,6 +101,7 @@ export function ActivityRecorder() {
   const motionPermissionGrantedRef = useRef(false);
   const motionPermissionRequestRef = useRef<Promise<boolean> | undefined>(undefined);
   const motionRunningRef = useRef(false);
+  const nativeStepReadingRef = useRef<Pick<NativeStepReading, 'steps' | 'stepTimestamp'>>({ steps: 0, stepTimestamp: 0 });
   const locationSeedRef = useRef<GeolocationPosition | undefined>(undefined);
 
   const checkStorage = useCallback(async () => {
@@ -265,7 +269,34 @@ export function ActivityRecorder() {
   }), []);
 
   const requestMotionAccess = useCallback(async () => {
+    if (hasNativeStepCounterBridge()) {
+      try {
+        const status = await FlinkoutStepCounter.getStatus();
+        if (!status.stepSensorAvailable) {
+          setMotionSource('NONE');
+          setMotionStatus('UNAVAILABLE');
+          setMotionMessage('This Android device does not provide a hardware step counter. Steps are unavailable; GPS and timing still work.');
+          return false;
+        }
+        if (status.permission === 'denied') {
+          setMotionSource('NONE');
+          setMotionStatus('DENIED');
+          setMotionMessage('Physical activity permission is blocked. Enable it in Android app settings to count steps.');
+          return false;
+        }
+        setMotionSource('NATIVE');
+        setMotionStatus('READY');
+        setMotionMessage('Android step counter is ready. Physical activity permission will be requested when needed.');
+        return true;
+      } catch {
+        setMotionSource('NONE');
+        setMotionStatus('UNAVAILABLE');
+        setMotionMessage('The Android step counter bridge is unavailable. GPS and timing still work.');
+        return false;
+      }
+    }
     if (!window.isSecureContext) {
+      setMotionSource('NONE');
       setMotionStatus('UNAVAILABLE');
       setMotionMessage('Motion permission cannot open over HTTP. Reopen Flinkout from an HTTPS address.');
       return false;
@@ -273,11 +304,13 @@ export function ActivityRecorder() {
     const MotionConstructor = window.DeviceMotionEvent as MotionPermissionConstructor | undefined;
     const SensorConstructor = (window as Window & { LinearAccelerationSensor?: LinearSensorConstructor }).LinearAccelerationSensor;
     if (!policyAllows('accelerometer') || !policyAllows('gyroscope')) {
+      setMotionSource('NONE');
       setMotionStatus('DENIED');
       setMotionMessage('Motion sensors are blocked by this page. Reload Flinkout before trying again.');
       return false;
     }
     if (!MotionConstructor && !SensorConstructor) {
+      setMotionSource('NONE');
       setMotionStatus('UNAVAILABLE');
       setMotionMessage('This browser does not expose motion sensors to websites.');
       return false;
@@ -291,6 +324,7 @@ export function ActivityRecorder() {
         motionPermissionGrantedRef.current = false;
       }
       if (!motionPermissionGrantedRef.current) {
+        setMotionSource('NONE');
         setMotionStatus('DENIED');
         setMotionMessage('Motion access was denied. Enable Motion & Orientation Access in this site\'s browser settings.');
         return false;
@@ -298,8 +332,9 @@ export function ActivityRecorder() {
     } else {
       motionPermissionGrantedRef.current = true;
     }
+    setMotionSource('BROWSER_ESTIMATED');
     setMotionStatus('READY');
-    setMotionMessage('Motion access is ready. Step tracking will begin with the activity.');
+    setMotionMessage('Browser motion access is ready. Step values will be estimated from motion patterns.');
     return true;
   }, []);
 
@@ -307,22 +342,79 @@ export function ActivityRecorder() {
     motionCleanupRef.current?.();
     motionCleanupRef.current = undefined;
     motionRunningRef.current = false;
+    nativeStepReadingRef.current = { steps: 0, stepTimestamp: 0 };
   }, []);
 
   const beginMotionSensors = useCallback(async (type: ActivityType, requestPermission: boolean) => {
     stopMotionSensors();
     motionDetectorRef.current = initialStepDetectorState();
     if (type === 'RIDE') {
+      setMotionSource('NONE');
       setMotionStatus('NOT_USED');
       setMotionMessage('Ride distance uses GPS; accelerometer-only distance would drift and is not reported as accurate.');
       return;
     }
+    if (hasNativeStepCounterBridge()) {
+      motionRunningRef.current = true;
+      setMotionSource('NATIVE');
+      setMotionStatus('CHECKING');
+      setMotionMessage('Starting the Android step counter...');
+      let removeNativeListener: (() => Promise<void>) | undefined;
+      try {
+        const listener = await FlinkoutStepCounter.addListener('stepUpdate', reading => {
+          if (!reading.stepSensorAvailable) return;
+          const previous = nativeStepReadingRef.current;
+          nativeStepReadingRef.current = { steps: reading.steps, stepTimestamp: reading.stepTimestamp };
+          const count = reading.steps - previous.steps;
+          if (count <= 0) return;
+          const current = activityRef.current;
+          if (!current || current.status !== 'RECORDING') return;
+          const elapsedMs = previous.stepTimestamp > 0 ? reading.stepTimestamp - previous.stepTimestamp : 0;
+          const measuredCadence = elapsedMs > 0 ? count * 60_000 / elapsedMs : 0;
+          const cadence = measuredCadence >= 30 && measuredCadence <= 240 ? measuredCadence : current.cadenceSpm || 100;
+          const recordedAt = new Date(reading.stepTimestamp || Date.now()).toISOString();
+          persist(recordMotionSteps(current, count, cadence, recordedAt, 'NATIVE'));
+        });
+        removeNativeListener = () => listener.remove();
+        const started = await FlinkoutStepCounter.start();
+        if (!started.stepSensorAvailable) {
+          await listener.remove();
+          motionRunningRef.current = false;
+          setMotionSource('NONE');
+          setMotionStatus('UNAVAILABLE');
+          setMotionMessage('This Android device does not provide a hardware step counter. Steps are unavailable; GPS and timing still work.');
+          return;
+        }
+        nativeStepReadingRef.current = { steps: started.steps, stepTimestamp: started.stepTimestamp };
+        const current = activityRef.current;
+        if (current?.status === 'RECORDING') persist({ ...current, stepSource: 'NATIVE', updatedAt: now() });
+        setMotionStatus('ACTIVE');
+        setMotionMessage(`Native Android ${started.sensorType === 'STEP_COUNTER' ? 'step counter' : 'step detector'} active.`);
+        motionCleanupRef.current = () => {
+          void listener.remove();
+          void FlinkoutStepCounter.stop();
+        };
+      } catch (error) {
+        void removeNativeListener?.();
+        void FlinkoutStepCounter.stop().catch(() => undefined);
+        motionRunningRef.current = false;
+        setMotionSource('NONE');
+        const denied = error instanceof Error && /denied|permission/i.test(error.message);
+        setMotionStatus(denied ? 'DENIED' : 'UNAVAILABLE');
+        setMotionMessage(denied
+          ? 'Physical activity permission was denied. Enable it in Android app settings to count steps.'
+          : 'The Android step counter could not start. GPS and timing still work.');
+      }
+      return;
+    }
     if (!window.isSecureContext) {
+      setMotionSource('NONE');
       setMotionStatus('UNAVAILABLE');
       setMotionMessage('Motion sensors require a secure connection. GPS and timing will continue.');
       return;
     }
     if (!policyAllows('accelerometer') || !policyAllows('gyroscope')) {
+      setMotionSource('NONE');
       setMotionStatus('DENIED');
       setMotionMessage('Motion sensors are blocked by this page. Reload Flinkout before trying again.');
       return;
@@ -333,18 +425,24 @@ export function ActivityRecorder() {
     const acceptSample = (x: number | null, y: number | null, z: number | null, includesGravity: boolean, timestamp: number, rotationRate?: number | null) => {
       if (x === null || y === null || z === null) return;
       sampleSeen = true;
+      setMotionSource('BROWSER_ESTIMATED');
       setMotionStatus('ACTIVE');
-      setMotionMessage('Motion sensors are tracking steps and can estimate distance if GPS drops out.');
+      setMotionMessage('Browser motion estimate active. Step values are estimated, not Android hardware step-counter readings.');
       const result = detectStep(motionDetectorRef.current, { x, y, z, includesGravity, timestamp, rotationRate });
       motionDetectorRef.current = result.state;
       const current = activityRef.current;
-      if (result.steps && current?.status === 'RECORDING') persist(recordMotionSteps(current, result.steps, result.cadenceSpm, now()));
+      if (current?.status === 'RECORDING') {
+        const sourced = current.stepSource === 'BROWSER_ESTIMATED' ? current : { ...current, stepSource: 'BROWSER_ESTIMATED' as const, updatedAt: now() };
+        if (result.steps) persist(recordMotionSteps(sourced, result.steps, result.cadenceSpm, now(), 'BROWSER_ESTIMATED'));
+        else if (sourced !== current) persist(sourced);
+      }
     };
 
     const startDeviceMotion = async () => {
       const MotionConstructor = window.DeviceMotionEvent as MotionPermissionConstructor | undefined;
       if (!MotionConstructor) {
         motionRunningRef.current = false;
+        setMotionSource('NONE');
         setMotionStatus('UNAVAILABLE');
         setMotionMessage('This browser does not expose motion sensors. GPS and timing will continue.');
         return;
@@ -352,6 +450,7 @@ export function ActivityRecorder() {
       if (typeof MotionConstructor.requestPermission === 'function' && !motionPermissionGrantedRef.current) {
         if (!requestPermission) {
           motionRunningRef.current = false;
+          setMotionSource('NONE');
           setMotionStatus('NEEDS_PERMISSION');
           setMotionMessage('Tap enable to restore step and motion-distance tracking.');
           return;
@@ -363,6 +462,7 @@ export function ActivityRecorder() {
         }
         if (!motionPermissionGrantedRef.current) {
           motionRunningRef.current = false;
+          setMotionSource('NONE');
           setMotionStatus('DENIED');
           setMotionMessage('Motion access was denied. GPS and timing will continue.');
           return;
@@ -648,6 +748,7 @@ export function ActivityRecorder() {
       sensorDistanceM: 0,
       sensorDistanceOffsetM: 0,
       steps: 0,
+      stepSource: 'UNAVAILABLE',
       cadenceSpm: 0,
       distanceSource: 'NONE',
       currentPaceSPerKm: null,
@@ -888,14 +989,25 @@ export function ActivityRecorder() {
 
   const seconds = activity ? elapsed : 0;
   const speed = activity ? averageSpeedKmh(activity.distanceM, activity.movingTimeS ?? 0) : 0;
-  // The live value is the cumulative average. It remains readable between GPS
-  // updates instead of blinking as an instantaneous sample becomes stale.
-  const pace = formatPaceSeconds(activity?.averagePaceSPerKm ?? activity?.currentPaceSPerKm);
+  const motionEstimateActive = Boolean(activity && !activity.gpsAvailable && activity.distanceM > 0 && activity.distanceSource !== 'NONE');
+  const formattedPace = formatPaceSeconds(activity?.currentPaceSPerKm ?? activity?.averagePaceSPerKm);
+  const pace = motionEstimateActive && formattedPace !== '--' ? `~${formattedPace}` : formattedPace;
   const averagePace = formatPaceSeconds(activity?.averagePaceSPerKm);
   const elevationGainM = Math.min(activity?.elevationGainM ?? 0, (activity?.distanceM ?? 0) * 0.45);
   const elevation = activity?.currentElevationM === null || activity?.currentElevationM === undefined
     ? '--'
-    : `${activity.distanceM < 50 ? 0 : Math.max(0, Math.round(elevationGainM))} m`;
+    : `${activity.currentElevationM < 0 ? `${Math.abs(Math.round(activity.currentElevationM))} m below sea level` : `${Math.round(activity.currentElevationM)} m`}${activity.distanceM >= 50 && elevationGainM >= 1 ? ` ↑${Math.round(elevationGainM)} m` : ''}`;
+  const distance = `${motionEstimateActive ? '~' : ''}${formatDistance(activity?.distanceM ?? 0)}`;
+  const calories = `${motionEstimateActive ? '~' : ''}${Math.round(activity?.caloriesKcal ?? 0)} kcal`;
+  const stepsUnavailable = (motionStatus === 'UNAVAILABLE' || motionStatus === 'DENIED') && !(activity?.steps ?? 0);
+  const steps = stepsUnavailable ? '--' : (activity?.steps ?? 0).toLocaleString();
+  const trackingSource = activity?.status === 'PAUSED'
+    ? 'Tracking paused'
+    : motionSource === 'NATIVE'
+      ? activity?.gpsAvailable ? 'GPS + native steps' : 'Native motion tracking'
+      : motionSource === 'BROWSER_ESTIMATED'
+        ? activity?.gpsAvailable ? 'GPS + browser motion estimate' : 'Browser motion estimate'
+        : activity?.gpsAvailable ? 'GPS only' : 'Step sensor unavailable';
   const liveComments = liveActivity?.comments ?? [];
   const gpsProblem = /denied|unavailable|too long|blocked|weak/i.test(gps);
   const accessNoteState = secureContext === 'INSECURE' ? 'insecure' : storageState === 'ERROR' ? 'error' : locationAccess === 'DENIED' ? 'denied' : restoring || startPending ? 'checking' : 'ready';
@@ -964,11 +1076,11 @@ export function ActivityRecorder() {
       <span className={`live-session-chip ${live ? 'sharing' : ''}`}><i /> {live ? 'Live now' : activity.status === 'PAUSED' ? 'Recording paused' : activity.liveRequested ? 'Waiting to go live' : 'Recording only'} - {labelFor(activity.type)}</span>
     </div>
     <section className="live-metrics-panel">
-      <div className="live-primary-metrics"><span><small>Distance</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
-      <div className="live-secondary-metrics"><span><small>Steps</small><strong>{activity.type === 'RIDE' ? '-' : (activity.steps ?? 0).toLocaleString()}</strong></span><span><small>Elevation</small><strong>{elevation}</strong></span><span><small>Calories</small><strong>{Math.round(activity.caloriesKcal ?? 0)} kcal</strong></span></div>
+      <div className="live-primary-metrics"><span><small>Distance</small><strong>{distance}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
+      <div className="live-secondary-metrics"><span><small>Steps</small><strong>{activity.type === 'RIDE' ? '-' : steps}</strong></span><span><small>Elevation</small><strong>{elevation}</strong></span><span><small>Calories</small><strong>{calories}</strong></span></div>
       <p className={`status ${gpsProblem ? 'warning' : ''}`} role="status">{gps}{gpsProblem ? motionStatus === 'ACTIVE' && activity.type !== 'RIDE' ? ' Motion sensors are continuing steps and estimated distance.' : ' Timing continues, but distance may be unavailable.' : ''}</p>
       {(locationAccess === 'DENIED' || locationAccess === 'UNAVAILABLE') && <button className="enable-location-button" onClick={() => void requestLocationAccess().then(allowed => { if (allowed) { stopWatch(); beginWatch(); } })}>Try location again</button>}
-      <p className={`status motion-status ${motionStatus === 'DENIED' || motionStatus === 'UNAVAILABLE' ? 'warning' : ''}`} role="status">{motionMessage}</p>
+      <p className={`status motion-status ${motionStatus === 'DENIED' || motionStatus === 'UNAVAILABLE' ? 'warning' : ''}`} role="status">{trackingSource}. {motionMessage}</p>
       {(motionStatus === 'NEEDS_PERMISSION' || motionStatus === 'DENIED') && activity.type !== 'RIDE' && <button className="enable-motion-button" onClick={() => void beginMotionSensors(activity.type, true)}>Enable motion sensors</button>}
       {liveMessage && <p className={`hint live-sharing-message ${livePending ? 'pending' : ''}`} role="status">{liveMessage}</p>}
       {liveAttempted && !live && activity.liveRequested && !activity.liveSessionId && <button className="retry-live-button" onClick={() => { setLiveAttempted(false); setLiveMessage('Retrying live sharing...'); }} disabled={!online || livePending}>Retry live sharing</button>}
@@ -986,5 +1098,6 @@ export function ActivityRecorder() {
 
 function Metrics({ activity, seconds, speed, pace }: { activity: LocalActivity; seconds: number; speed: number; pace: string }) {
   const paceActivity = activity.type === 'WALK' || activity.type === 'RUN' || activity.type === 'HIKE';
-  return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance - {distanceSourceLabel(activity)}</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? 'Average pace' : 'Average speed'}</span></div><div className="metric"><strong>{paceActivity ? (activity.steps ?? 0).toLocaleString() : activity.route.length}</strong><span>{paceActivity ? 'Steps' : 'GPS samples'}</span></div></section>;
+  const stepMetric = activity.stepSource === 'UNAVAILABLE' && !(activity.steps ?? 0) ? '--' : (activity.steps ?? 0).toLocaleString();
+  return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance - {distanceSourceLabel(activity)}</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? 'Average pace' : 'Average speed'}</span></div><div className="metric"><strong>{paceActivity ? stepMetric : activity.route.length}</strong><span>{paceActivity ? 'Steps' : 'GPS samples'}</span></div></section>;
 }

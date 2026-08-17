@@ -7,6 +7,7 @@ const point = z.object({
   altitude: z.number().finite().nullable(),
   altitudeAccuracy: z.number().nonnegative().nullable().optional(),
   speed: z.number().finite().nullable(),
+  startsNewSegment: z.boolean().optional(),
   recordedAt: z.string().datetime(),
 });
 

@@ -80,8 +80,9 @@ describe('motion step detection', () => {
 describe('GPS and motion fusion', () => {
   it('uses motion for steps but not distance while GPS is reliable', () => {
     const withGps = recordGpsSegment(activity(), 100, '2026-08-08T10:01:00.000Z');
-    const withSteps = recordMotionSteps(withGps, 3, 100, '2026-08-08T10:01:02.000Z');
+    const withSteps = recordMotionSteps(withGps, 3, 100, '2026-08-08T10:01:02.000Z', 'NATIVE');
     expect(withSteps.steps).toBe(3);
+    expect(withSteps.stepSource).toBe('NATIVE');
     expect(withSteps.distanceM).toBeCloseTo(100, 4);
     expect(withSteps.distanceSource).toBe('FUSED');
   });
@@ -95,15 +96,15 @@ describe('GPS and motion fusion', () => {
     expect(withSteps.caloriesKcal).toBeGreaterThan(0);
   });
 
-  it('uses validated GPS distance as a fallback when motion sensors undercount steps', () => {
+  it('does not invent a step count from GPS distance', () => {
     const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z')).activity;
     const moved = recordGpsSample(first, point(0.0009, '2026-08-08T10:03:00.000Z')).activity;
     const movedAgain = recordGpsSample(moved, point(0.0018, '2026-08-08T10:06:00.000Z')).activity;
     expect(movedAgain.distanceM).toBeGreaterThan(199);
-    expect(movedAgain.steps).toBeGreaterThanOrEqual(330);
+    expect(movedAgain.steps ?? 0).toBe(0);
     expect(movedAgain.strideM).toBeCloseTo(0.6, 2);
     expect(movedAgain.averagePaceSPerKm).toBeCloseTo(1_798.6, 0);
-    expect(movedAgain.distanceSource).toBe('FUSED');
+    expect(movedAgain.distanceSource).toBe('GPS');
   });
 
   it('keeps the cumulative average pace through a stationary GPS heartbeat', () => {
@@ -122,6 +123,7 @@ describe('GPS and motion fusion', () => {
     expect(recovered.distanceM).toBeCloseTo(motionOnly.distanceM, 5);
     expect(recovered.gpsDistanceM).toBeCloseTo(motionOnly.distanceM, 5);
     expect(recovered.gpsAvailable).toBe(true);
+    expect(recovered.route.at(-1)?.startsNewSegment).toBe(true);
   });
 
   it('rejects poor accuracy, stationary jitter, and impossible jumps', () => {
@@ -135,6 +137,16 @@ describe('GPS and motion fusion', () => {
     const jump = recordGpsSample(first, point(0.01, '2026-08-08T10:00:01.000Z'));
     expect(jump.reason).toBe('IMPLAUSIBLE');
     expect(jump.activity.route).toHaveLength(1);
+  });
+
+  it('keeps the GPS route and distance moving when Android reports speed as zero', () => {
+    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z', { speed: 0 })).activity;
+    const secondResult = recordGpsSample(first, point(0.00009, '2026-08-08T10:00:10.000Z', { speed: 0 }));
+    const thirdResult = recordGpsSample(secondResult.activity, point(0.00018, '2026-08-08T10:00:20.000Z', { speed: 0 }));
+    expect(secondResult.reason).toBe('ACCEPTED');
+    expect(thirdResult.reason).toBe('ACCEPTED');
+    expect(thirdResult.activity.route).toHaveLength(3);
+    expect(thirdResult.activity.distanceM).toBeGreaterThan(19);
   });
 
   it('stops active metrics while paused', () => {

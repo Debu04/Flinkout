@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Flinkout</string>
+    <string name="title_activity_main">Flinkout</string>
+    <string name="package_name">com.flinkout.app</string>
+    <string name="custom_url_scheme">com.flinkout.app</string>
+</resources>
