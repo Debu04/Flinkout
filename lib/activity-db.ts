@@ -17,6 +17,7 @@ function normalise(activity: LocalActivity): LocalActivity {
     sensorDistanceM: activity.sensorDistanceM ?? 0,
     sensorDistanceOffsetM: activity.sensorDistanceOffsetM ?? activity.distanceM,
     steps: activity.steps ?? 0,
+    stepSource: activity.stepSource ?? 'UNAVAILABLE',
     cadenceSpm: activity.cadenceSpm ?? 0,
     movingTimeS: activity.movingTimeS ?? activity.elapsedBeforePauseS,
     lastMovementAt: activity.lastMovementAt ?? null,

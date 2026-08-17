@@ -9,6 +9,7 @@ export type SyncStatus = 'LOCAL' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 export type DistanceSource = 'GPS' | 'MOTION' | 'FUSED' | 'NONE';
 export type TrackingMode = 'GPS_MOTION' | 'MOTION_ONLY' | 'PAUSED';
 export type PaceSource = 'GPS' | 'MOTION_ESTIMATED';
+export type StepSource = 'NATIVE' | 'BROWSER_ESTIMATED' | 'UNAVAILABLE';
 export type RoutePoint = {
   latitude: number;
   longitude: number;
@@ -16,6 +17,7 @@ export type RoutePoint = {
   altitude: number | null;
   altitudeAccuracy?: number | null;
   speed: number | null;
+  startsNewSegment?: boolean;
   recordedAt: string;
 };
 export type LocalActivity = {
@@ -40,6 +42,7 @@ export type LocalActivity = {
   sensorDistanceM?: number;
   sensorDistanceOffsetM?: number;
   steps?: number;
+  stepSource?: StepSource;
   cadenceSpm?: number;
   strideM?: number;
   distanceSource?: DistanceSource;
