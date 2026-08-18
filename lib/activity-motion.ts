@@ -1,10 +1,13 @@
 import { distanceBetween, elapsedSeconds, type ActivityType, type LocalActivity, type PaceSegment, type RoutePoint, type StepSource, type TrackingDiagnostics } from './activity';
 
 export const GPS_ACCURACY_LIMITS_M: Record<ActivityType, number> = {
-  WALK: 25,
-  RUN: 25,
-  HIKE: 30,
-  RIDE: 40,
+  // Android browsers commonly settle between 25 m and 50 m before improving.
+  // Route jitter is handled separately, so rejecting those fixes entirely makes
+  // outdoor recordings appear dead even though the phone is providing GPS.
+  WALK: 50,
+  RUN: 50,
+  HIKE: 60,
+  RIDE: 75,
 };
 
 export const TRACKING_THRESHOLDS = {
@@ -285,7 +288,8 @@ function reconcileDistanceAndSteps(activity: LocalActivity): LocalActivity {
   const distanceM = gpsDistanceM + motionFallbackDistanceM;
   const gpsEstimatedSteps = activity.type === 'RIDE' || strideM <= 0 ? 0 : Math.floor(gpsDistanceM / strideM);
   const native = activity.stepSource === 'NATIVE';
-  const estimatedTotal = gpsEstimatedSteps + (activity.motionFallbackSteps ?? 0);
+  const motionFallbackSteps = activity.motionFallbackSteps ?? 0;
+  const estimatedTotal = gpsEstimatedSteps + motionFallbackSteps;
   const steps = activity.type === 'RIDE'
     ? 0
     : native
@@ -297,7 +301,7 @@ function reconcileDistanceAndSteps(activity: LocalActivity): LocalActivity {
       ? 'NATIVE'
       : gpsDistanceM > 0
         ? 'GPS_MOTION_ESTIMATED'
-        : (activity.browserMotionSteps ?? 0) > 0
+        : motionFallbackSteps > 0
           ? 'BROWSER_ESTIMATED'
           : 'UNAVAILABLE';
   const distanceSource = gpsDistanceM > 0 && motionFallbackDistanceM > 0
@@ -326,10 +330,14 @@ export function recordMotionSteps(activity: LocalActivity, count: number, cadenc
   const strideM = activity.strideM ?? defaultStrideM(activity.type);
   const native = source === 'NATIVE';
   const gpsReliable = activity.gpsAvailable === true && activity.trackingMode !== 'MOTION_ONLY';
-  const fallbackSteps = gpsReliable ? 0 : count;
+  // Do not turn motion samples into distance while the first GPS fix is still
+  // being acquired. Fallback estimation starts only after GPS is explicitly
+  // reported unavailable; native hardware steps can still be displayed.
+  const fallbackActive = activity.gpsAvailable === false && activity.trackingMode === 'MOTION_ONLY';
+  const fallbackSteps = fallbackActive ? count : 0;
   const fallbackDistance = fallbackSteps * strideM;
   const suggestedSeconds = cadenceSpm > 0 ? count * 60 / cadenceSpm : count * 0.6;
-  const withTime = gpsReliable ? activity : advanceMovingTime(activity, recordedAt, suggestedSeconds);
+  const withTime = fallbackActive ? advanceMovingTime(activity, recordedAt, suggestedSeconds) : activity;
   const motionSpeedMps = cadenceSpm > 0 ? cadenceSpm * strideM / 60 : 0;
   const motionPace = motionSpeedMps > 0 ? 1000 / motionSpeedMps : null;
   const updated = reconcileDistanceAndSteps({
@@ -341,9 +349,9 @@ export function recordMotionSteps(activity: LocalActivity, count: number, cadenc
     stepSource: native ? 'NATIVE' : activity.stepSource,
     cadenceSpm: Math.round(cadenceSpm),
     strideM,
-    currentPaceSPerKm: !gpsReliable && motionPace && plausiblePace(activity.type, motionPace) ? motionPace : activity.currentPaceSPerKm,
-    paceSource: !gpsReliable && motionPace ? 'MOTION_ESTIMATED' : activity.paceSource,
-    trackingMode: gpsReliable ? 'GPS_MOTION' : 'MOTION_ONLY',
+    currentPaceSPerKm: fallbackActive && motionPace && plausiblePace(activity.type, motionPace) ? motionPace : activity.currentPaceSPerKm,
+    paceSource: fallbackActive && motionPace ? 'MOTION_ESTIMATED' : activity.paceSource,
+    trackingMode: gpsReliable ? 'GPS_MOTION' : fallbackActive ? 'MOTION_ONLY' : activity.trackingMode,
     lastSensorAt: recordedAt,
     updatedAt: recordedAt,
   });
@@ -363,16 +371,25 @@ function validCoordinate(point: RoutePoint) {
 const maxSpeedMps = (type: ActivityType) => ({ WALK: 3.5, RUN: 8, HIKE: 4, RIDE: 22 })[type];
 
 function updateElevation(activity: LocalActivity, point: RoutePoint, secondsSincePrevious: number, horizontalDistanceM: number) {
-  const altitudeAccuracy = point.altitudeAccuracy;
+  const reportedAltitudeAccuracy = point.altitudeAccuracy;
+  // Some Android browser providers return a real altitude but leave
+  // altitudeAccuracy null. Use it only when the horizontal fix is excellent,
+  // and treat it as the least-trusted accepted vertical accuracy so the normal
+  // smoothing/noise floor remains conservative.
+  const altitudeAccuracy = reportedAltitudeAccuracy !== undefined && reportedAltitudeAccuracy !== null && Number.isFinite(reportedAltitudeAccuracy)
+    ? reportedAltitudeAccuracy
+    : point.altitude !== null && Number.isFinite(point.altitude) && point.accuracy !== null && point.accuracy <= 10
+      ? TRACKING_THRESHOLDS.altitudeAccuracyM
+      : null;
   const currentDiagnostics = diagnostics(activity);
   const withAccuracy = {
     ...activity,
     trackingDiagnostics: {
       ...currentDiagnostics,
-      lastAltitudeAccuracyM: altitudeAccuracy !== undefined && altitudeAccuracy !== null && Number.isFinite(altitudeAccuracy) ? altitudeAccuracy : null,
+      lastAltitudeAccuracyM: altitudeAccuracy,
     },
   };
-  if (point.altitude === null || !Number.isFinite(point.altitude) || altitudeAccuracy === undefined || altitudeAccuracy === null || altitudeAccuracy > TRACKING_THRESHOLDS.altitudeAccuracyM) return withAccuracy;
+  if (point.altitude === null || !Number.isFinite(point.altitude) || altitudeAccuracy === null || altitudeAccuracy > TRACKING_THRESHOLDS.altitudeAccuracyM) return withAccuracy;
   if (horizontalDistanceM <= 0 || secondsSincePrevious <= 0) return withAccuracy;
   const samples = [...(activity.altitudeSamplesM ?? []).slice(-4), point.altitude];
   const filteredAltitude = median(samples);
@@ -432,7 +449,12 @@ export function recordGpsSample(activity: LocalActivity, point: RoutePoint, reco
     return { activity: inaccurate, accepted: false, moving: false, reason: 'INACCURATE' };
   }
 
-  const previous = activity.locationBaseline ?? activity.route.at(-1);
+  // The route contains only accepted GPS points, so its last point is the
+  // authoritative distance baseline. Never use a rejected stationary reading
+  // here: normal walking often advances only 1-2 m per callback and repeatedly
+  // rebasing to those readings prevents movement from ever reaching the jitter
+  // threshold.
+  const previous = activity.route.at(-1);
   const recovering = activity.gpsAvailable === false && activity.route.length > 0;
   if (!previous || recovering) {
     const baselinePoint = recovering ? { ...point, startsNewSegment: true } : point;
@@ -464,9 +486,11 @@ export function recordGpsSample(activity: LocalActivity, point: RoutePoint, reco
   if (seconds <= 0) return { activity: reject(activity, 'rejectedStalePoints'), accepted: false, moving: false, reason: 'STALE' };
   const segmentM = distanceBetween(previous, point);
   const coordinateSpeed = segmentM / seconds;
-  const reportedSpeed = point.speed !== null && point.speed >= 0 ? point.speed : null;
   const jitterThresholdM = Math.max(3, Math.min(9, ((previous.accuracy ?? 20) + accuracy) * 0.28));
-  if (coordinateSpeed > maxSpeedMps(activity.type) * 1.2 || (reportedSpeed !== null && reportedSpeed > maxSpeedMps(activity.type) * 1.5)) {
+  // Browser-reported speed is frequently zero or briefly wrong on Android.
+  // Coordinate displacement is the authoritative movement signal, so a bad
+  // reported speed must not veto an otherwise plausible route segment.
+  if (coordinateSpeed > maxSpeedMps(activity.type) * 1.2) {
     const impossible = reject({ ...activity, gpsAccuracyM: accuracy }, 'rejectedImpossiblePoints');
     return { activity: impossible, accepted: false, moving: false, reason: 'IMPLAUSIBLE' };
   }
@@ -476,7 +500,6 @@ export function recordGpsSample(activity: LocalActivity, point: RoutePoint, reco
     const stationaryDiagnostics = diagnostics(activity);
     const stationary: LocalActivity = {
       ...activity,
-      locationBaseline: point,
       gpsAvailable: true,
       gpsAccuracyM: accuracy,
       lastReliableGpsAt: point.recordedAt,
