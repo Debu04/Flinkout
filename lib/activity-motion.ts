@@ -1,16 +1,37 @@
-import { distanceBetween, type ActivityType, type LocalActivity, type RoutePoint, type StepSource } from './activity';
+import { distanceBetween, elapsedSeconds, type ActivityType, type LocalActivity, type PaceSegment, type RoutePoint, type StepSource, type TrackingDiagnostics } from './activity';
+
+export const GPS_ACCURACY_LIMITS_M: Record<ActivityType, number> = {
+  WALK: 25,
+  RUN: 25,
+  HIKE: 30,
+  RIDE: 40,
+};
 
 export const TRACKING_THRESHOLDS = {
-  maxGpsAccuracyM: 50,
-  stationaryHeartbeatS: 15,
-  minStepIntervalMs: 300,
-  maxStepIntervalMs: 1_200,
-  patternResetMs: 1_600,
-  stepPeakMin: 0.55,
+  locationStaleMs: 10_000,
+  rollingPaceWindowS: 30,
+  rollingPaceMinimumDurationS: 10,
+  rollingPaceMinimumDistanceM: 20,
+  stationaryPaceTimeoutS: 10,
+  patternResetMs: 1_800,
+  stepPeakMin: 0.45,
   stepPeakMax: 5.5,
-  stepValleyMax: 0.35,
+  stepDynamicMax: 2.2,
   maxRotationRate: 650,
+  altitudeAccuracyM: 20,
 } as const;
+
+const EMPTY_DIAGNOSTICS: TrackingDiagnostics = {
+  acceptedGpsPoints: 0,
+  rejectedInaccuratePoints: 0,
+  rejectedStationaryPoints: 0,
+  rejectedImpossiblePoints: 0,
+  rejectedStalePoints: 0,
+  rejectedInvalidPoints: 0,
+  rollingPaceDistanceM: 0,
+  rollingPaceDurationS: 0,
+  lastAltitudeAccuracyM: null,
+};
 
 export type MotionSample = {
   x: number;
@@ -26,6 +47,9 @@ export type StepDetectorState = {
   gravityY: number;
   gravityZ: number;
   smoothedMagnitude: number;
+  noiseMagnitude: number;
+  dynamicThreshold: number;
+  samplesSinceThresholdUpdate: number;
   armed: boolean;
   lastCandidateAt: number;
   candidateIntervals: number[];
@@ -54,6 +78,9 @@ export const initialStepDetectorState = (): StepDetectorState => ({
   gravityY: 0,
   gravityZ: 0,
   smoothedMagnitude: 0,
+  noiseMagnitude: 0,
+  dynamicThreshold: TRACKING_THRESHOLDS.stepPeakMin,
+  samplesSinceThresholdUpdate: 0,
   armed: true,
   lastCandidateAt: Number.NEGATIVE_INFINITY,
   candidateIntervals: [],
@@ -69,12 +96,21 @@ function median(values: number[]) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function cadenceIntervalBounds(type: ActivityType): [number, number] {
+  return type === 'RUN' ? [250, 500] : [333, 1_333];
+}
+
 /**
- * Detects a repeated step pattern instead of accepting a single acceleration
- * spike. Three cadence-consistent peak/valley cycles establish walking; strong
- * acceleration or rotation resets confidence so shaking is not accumulated.
+ * Uses orientation-independent linear acceleration and requires a repeated,
+ * cadence-consistent peak/valley pattern. The noise-derived threshold changes
+ * only every ten samples and is blended gradually so ordinary phone position
+ * changes do not continually retune the detector.
  */
-export function detectStep(state: StepDetectorState, sample: MotionSample): StepDetection {
+export function detectStep(state: StepDetectorState, sample: MotionSample, type: ActivityType = 'WALK'): StepDetection {
   const gravityAlpha = 0.9;
   const gravityX = sample.includesGravity ? (state.initialised ? gravityAlpha * state.gravityX + (1 - gravityAlpha) * sample.x : sample.x) : 0;
   const gravityY = sample.includesGravity ? (state.initialised ? gravityAlpha * state.gravityY + (1 - gravityAlpha) * sample.y : sample.y) : 0;
@@ -84,9 +120,18 @@ export function detectStep(state: StepDetectorState, sample: MotionSample): Step
   const z = sample.z - gravityZ;
   const magnitude = Math.sqrt(x * x + y * y + z * z);
   const smoothedMagnitude = state.initialised ? state.smoothedMagnitude * 0.62 + magnitude * 0.38 : magnitude;
+  const boundedNoiseSample = Math.min(magnitude, 1.2);
+  const noiseMagnitude = state.initialised ? state.noiseMagnitude * 0.96 + boundedNoiseSample * 0.04 : boundedNoiseSample;
+  const thresholdSamples = state.samplesSinceThresholdUpdate + 1;
+  const thresholdTarget = clamp(noiseMagnitude * 2.1 + 0.25, TRACKING_THRESHOLDS.stepPeakMin, TRACKING_THRESHOLDS.stepDynamicMax);
+  const dynamicThreshold = thresholdSamples >= 10
+    ? state.dynamicThreshold * 0.82 + thresholdTarget * 0.18
+    : state.dynamicThreshold;
+  const samplesSinceThresholdUpdate = thresholdSamples >= 10 ? 0 : thresholdSamples;
+  const valleyThreshold = Math.min(0.65, Math.max(0.3, dynamicThreshold * 0.65));
   const longGap = sample.timestamp - state.lastCandidateAt > TRACKING_THRESHOLDS.patternResetMs;
   const strongShake = smoothedMagnitude > TRACKING_THRESHOLDS.stepPeakMax
-    || ((sample.rotationRate ?? 0) > TRACKING_THRESHOLDS.maxRotationRate && smoothedMagnitude > 2.2);
+    || ((sample.rotationRate ?? 0) > TRACKING_THRESHOLDS.maxRotationRate && smoothedMagnitude > dynamicThreshold * 1.8);
 
   let armed = state.armed;
   let lastCandidateAt = state.lastCandidateAt;
@@ -103,15 +148,15 @@ export function detectStep(state: StepDetectorState, sample: MotionSample): Step
     walkingPattern = false;
     cadenceSpm = 0;
   } else {
-    if (smoothedMagnitude <= TRACKING_THRESHOLDS.stepValleyMax) armed = true;
-    const candidate = armed && smoothedMagnitude >= TRACKING_THRESHOLDS.stepPeakMin;
+    if (smoothedMagnitude <= valleyThreshold) armed = true;
+    const candidate = armed && smoothedMagnitude >= dynamicThreshold;
     if (candidate) {
       armed = false;
       const interval = sample.timestamp - lastCandidateAt;
-      const plausibleInterval = !Number.isFinite(lastCandidateAt)
-        || (interval >= TRACKING_THRESHOLDS.minStepIntervalMs && interval <= TRACKING_THRESHOLDS.maxStepIntervalMs);
+      const [minimumInterval, maximumInterval] = cadenceIntervalBounds(type);
+      const plausibleInterval = !Number.isFinite(lastCandidateAt) || (interval >= minimumInterval && interval <= maximumInterval);
       const expectedInterval = candidateIntervals.length ? median(candidateIntervals) : interval;
-      const cadenceConsistent = !candidateIntervals.length || Math.abs(interval - expectedInterval) <= Math.max(180, expectedInterval * 0.38);
+      const cadenceConsistent = !candidateIntervals.length || Math.abs(interval - expectedInterval) <= Math.max(170, expectedInterval * 0.34);
 
       if (!plausibleInterval || !cadenceConsistent) {
         candidateIntervals = [];
@@ -119,7 +164,7 @@ export function detectStep(state: StepDetectorState, sample: MotionSample): Step
         walkingPattern = false;
         cadenceSpm = 0;
       } else if (Number.isFinite(lastCandidateAt)) {
-        candidateIntervals = [...candidateIntervals.slice(-3), interval];
+        candidateIntervals = [...candidateIntervals.slice(-4), interval];
         cadenceSpm = 60_000 / median(candidateIntervals);
         if (walkingPattern) acceptedSteps = 1;
         else {
@@ -137,34 +182,31 @@ export function detectStep(state: StepDetectorState, sample: MotionSample): Step
     }
   }
 
-  const nextState: StepDetectorState = {
-    gravityX,
-    gravityY,
-    gravityZ,
-    smoothedMagnitude,
-    armed,
-    lastCandidateAt,
-    candidateIntervals,
-    pendingCandidateCount,
-    walkingPattern,
+  return {
+    step: acceptedSteps > 0,
+    steps: acceptedSteps,
     cadenceSpm,
-    initialised: true,
+    state: {
+      gravityX,
+      gravityY,
+      gravityZ,
+      smoothedMagnitude,
+      noiseMagnitude,
+      dynamicThreshold,
+      samplesSinceThresholdUpdate,
+      armed,
+      lastCandidateAt,
+      candidateIntervals,
+      pendingCandidateCount,
+      walkingPattern,
+      cadenceSpm,
+      initialised: true,
+    },
   };
-  return { step: acceptedSteps > 0, steps: acceptedSteps, cadenceSpm, state: nextState };
 }
 
 export function defaultStrideM(type: ActivityType) {
-  // A conservative initial walking stride keeps distance-derived steps close
-  // to common phone pedometers until a personal stride can be calibrated.
-  return ({ WALK: 0.6, RUN: 1, HIKE: 0.62, RIDE: 0 })[type];
-}
-
-export function calibratedStrideM(type: ActivityType, gpsDistanceM: number, steps: number, currentStrideM: number) {
-  if (type === 'RIDE' || gpsDistanceM < 30 || steps < 20) return currentStrideM;
-  const bounds = ({ WALK: [0.45, 0.95], RUN: [0.7, 1.6], HIKE: [0.4, 0.95], RIDE: [0, 0] })[type];
-  const observed = gpsDistanceM / steps;
-  const bounded = Math.min(bounds[1], Math.max(bounds[0], observed));
-  return currentStrideM * 0.8 + bounded * 0.2;
+  return ({ WALK: 0.65, RUN: 1, HIKE: 0.62, RIDE: 0 })[type];
 }
 
 const paceBounds = (type: ActivityType): [number, number] => ({
@@ -186,30 +228,41 @@ function activityMet(type: ActivityType, speedKmh: number) {
   return speedKmh >= 22 ? 10 : speedKmh >= 16 ? 8 : speedKmh >= 10 ? 6.8 : 4;
 }
 
-/** MET/step estimate using a neutral 70 kg fallback until Flinkout stores user weight. */
-export function estimatedCalories(type: ActivityType, movingTimeS: number, distanceM: number, weightKg = 70, steps = 0) {
-  if (movingTimeS <= 0) return 0;
-  const speedKmh = distanceM > 0 ? distanceM / movingTimeS * 3.6 : ({ WALK: 4, RUN: 8, HIKE: 4, RIDE: 14 })[type];
-  const kcalPerMinute = activityMet(type, speedKmh) * 3.5 * weightKg / 200;
-  const metEstimate = kcalPerMinute * movingTimeS / 60;
-  const perStepEstimate = type === 'RIDE' ? 0 : steps * ({ WALK: 0.04, RUN: 0.06, HIKE: 0.055, RIDE: 0 })[type];
-  return Math.round(Math.max(metEstimate, perStepEstimate) * 10) / 10;
+/** Movement-based active calories using a documented neutral 70 kg fallback. */
+export function estimatedCalories(type: ActivityType, movingTimeS: number, distanceM: number, weightKg = 70) {
+  if (movingTimeS <= 0 || distanceM <= 0) return 0;
+  const speedKmh = distanceM / movingTimeS * 3.6;
+  const activeMet = Math.max(0, activityMet(type, speedKmh) - 1);
+  const kcalPerMinute = activeMet * 3.5 * weightKg / 200;
+  return Math.round(kcalPerMinute * movingTimeS / 60 * 10) / 10;
 }
 
-function withDerivedMetrics(activity: LocalActivity): LocalActivity {
+export function averagePaceSeconds(type: ActivityType, distanceM: number, activeElapsedS: number) {
+  return type !== 'RIDE' && distanceM > 0 && activeElapsedS > 0 ? activeElapsedS / (distanceM / 1000) : null;
+}
+
+export function averageMovingPaceSeconds(type: ActivityType, distanceM: number, movingTimeS: number) {
+  return type !== 'RIDE' && distanceM > 0 && movingTimeS > 0 ? movingTimeS / (distanceM / 1000) : null;
+}
+
+export function refreshActivityMetrics(activity: LocalActivity, activeElapsedS?: number): LocalActivity {
   const movingTimeS = activity.movingTimeS ?? 0;
-  const rawAveragePace = activity.type !== 'RIDE' && activity.distanceM >= 10 && movingTimeS >= 10
-    ? movingTimeS / (activity.distanceM / 1000)
-    : null;
+  const elapsed = activeElapsedS ?? elapsedSeconds(activity, Date.parse(activity.updatedAt));
   return {
     ...activity,
-    // Retain the last valid cumulative average rather than making the live pace
-    // disappear when a single GPS sample is stationary or briefly noisy.
-    averagePaceSPerKm: rawAveragePace && plausiblePace(activity.type, rawAveragePace)
-      ? rawAveragePace
-      : activity.averagePaceSPerKm ?? null,
-    caloriesKcal: estimatedCalories(activity.type, movingTimeS, activity.distanceM, 70, activity.steps ?? 0),
+    averagePaceSPerKm: averagePaceSeconds(activity.type, activity.distanceM, elapsed),
+    averageMovingPaceSPerKm: averageMovingPaceSeconds(activity.type, activity.distanceM, movingTimeS),
+    caloriesKcal: estimatedCalories(activity.type, movingTimeS, activity.distanceM),
   };
+}
+
+function diagnostics(activity: LocalActivity): TrackingDiagnostics {
+  return { ...EMPTY_DIAGNOSTICS, ...activity.trackingDiagnostics };
+}
+
+function reject(activity: LocalActivity, key: keyof Pick<TrackingDiagnostics, 'rejectedInaccuratePoints' | 'rejectedStationaryPoints' | 'rejectedImpossiblePoints' | 'rejectedStalePoints' | 'rejectedInvalidPoints'>) {
+  const current = diagnostics(activity);
+  return { ...activity, trackingDiagnostics: { ...current, [key]: current[key] + 1 } };
 }
 
 function advanceMovingTime(activity: LocalActivity, recordedAt: string, suggestedSeconds: number) {
@@ -221,36 +274,83 @@ function advanceMovingTime(activity: LocalActivity, recordedAt: string, suggeste
   };
 }
 
-export function recordMotionSteps(activity: LocalActivity, count: number, cadenceSpm: number, recordedAt: string, stepSource: StepSource = 'BROWSER_ESTIMATED'): LocalActivity {
+function displayedDistance(activity: LocalActivity) {
+  return (activity.gpsDistanceM ?? 0) + (activity.motionFallbackDistanceM ?? activity.sensorDistanceM ?? 0);
+}
+
+function reconcileDistanceAndSteps(activity: LocalActivity): LocalActivity {
+  const strideM = activity.strideM ?? defaultStrideM(activity.type);
+  const gpsDistanceM = activity.gpsDistanceM ?? 0;
+  const motionFallbackDistanceM = activity.motionFallbackDistanceM ?? activity.sensorDistanceM ?? 0;
+  const distanceM = gpsDistanceM + motionFallbackDistanceM;
+  const gpsEstimatedSteps = activity.type === 'RIDE' || strideM <= 0 ? 0 : Math.floor(gpsDistanceM / strideM);
+  const native = activity.stepSource === 'NATIVE';
+  const estimatedTotal = gpsEstimatedSteps + (activity.motionFallbackSteps ?? 0);
+  const steps = activity.type === 'RIDE'
+    ? 0
+    : native
+      ? activity.nativeSteps ?? activity.steps ?? 0
+      : Math.max(activity.steps ?? 0, estimatedTotal);
+  const stepSource: StepSource = activity.type === 'RIDE'
+    ? 'UNAVAILABLE'
+    : native
+      ? 'NATIVE'
+      : gpsDistanceM > 0
+        ? 'GPS_MOTION_ESTIMATED'
+        : (activity.browserMotionSteps ?? 0) > 0
+          ? 'BROWSER_ESTIMATED'
+          : 'UNAVAILABLE';
+  const distanceSource = gpsDistanceM > 0 && motionFallbackDistanceM > 0
+    ? 'FUSED'
+    : motionFallbackDistanceM > 0
+      ? 'MOTION'
+      : gpsDistanceM > 0
+        ? 'GPS'
+        : 'NONE';
+  return {
+    ...activity,
+    strideM,
+    gpsDistanceM,
+    motionFallbackDistanceM,
+    sensorDistanceM: motionFallbackDistanceM,
+    distanceM,
+    gpsEstimatedSteps,
+    steps,
+    stepSource,
+    distanceSource,
+  };
+}
+
+export function recordMotionSteps(activity: LocalActivity, count: number, cadenceSpm: number, recordedAt: string, source: StepSource = 'BROWSER_ESTIMATED'): LocalActivity {
   if (activity.type === 'RIDE' || activity.status !== 'RECORDING' || count <= 0) return activity;
   const strideM = activity.strideM ?? defaultStrideM(activity.type);
+  const native = source === 'NATIVE';
   const gpsReliable = activity.gpsAvailable === true && activity.trackingMode !== 'MOTION_ONLY';
-  const motionSegmentM = gpsReliable ? 0 : count * strideM;
-  const sensorDistanceM = (activity.sensorDistanceM ?? 0) + motionSegmentM;
-  const distanceM = activity.distanceM + motionSegmentM;
+  const fallbackSteps = gpsReliable ? 0 : count;
+  const fallbackDistance = fallbackSteps * strideM;
   const suggestedSeconds = cadenceSpm > 0 ? count * 60 / cadenceSpm : count * 0.6;
   const withTime = gpsReliable ? activity : advanceMovingTime(activity, recordedAt, suggestedSeconds);
   const motionSpeedMps = cadenceSpm > 0 ? cadenceSpm * strideM / 60 : 0;
   const motionPace = motionSpeedMps > 0 ? 1000 / motionSpeedMps : null;
-  return withDerivedMetrics({
+  const updated = reconcileDistanceAndSteps({
     ...withTime,
-    steps: (activity.steps ?? 0) + count,
-    stepSource,
+    nativeSteps: (activity.nativeSteps ?? (native ? activity.steps ?? 0 : 0)) + (native ? count : 0),
+    browserMotionSteps: (activity.browserMotionSteps ?? 0) + (native ? 0 : count),
+    motionFallbackSteps: (activity.motionFallbackSteps ?? 0) + fallbackSteps,
+    motionFallbackDistanceM: (activity.motionFallbackDistanceM ?? activity.sensorDistanceM ?? 0) + fallbackDistance,
+    stepSource: native ? 'NATIVE' : activity.stepSource,
     cadenceSpm: Math.round(cadenceSpm),
     strideM,
-    sensorDistanceM,
-    sensorDistanceOffsetM: activity.sensorDistanceOffsetM ?? activity.distanceM,
-    distanceM,
-    distanceSource: gpsReliable ? 'FUSED' : activity.route.length ? 'FUSED' : 'MOTION',
     currentPaceSPerKm: !gpsReliable && motionPace && plausiblePace(activity.type, motionPace) ? motionPace : activity.currentPaceSPerKm,
     paceSource: !gpsReliable && motionPace ? 'MOTION_ESTIMATED' : activity.paceSource,
     trackingMode: gpsReliable ? 'GPS_MOTION' : 'MOTION_ONLY',
     lastSensorAt: recordedAt,
     updatedAt: recordedAt,
   });
+  return refreshActivityMetrics(updated);
 }
 
-export function recordMotionStep(activity: LocalActivity, recordedAt: string): LocalActivity {
+export function recordMotionStep(activity: LocalActivity, recordedAt: string) {
   return recordMotionSteps(activity, 1, activity.cadenceSpm ?? 100, recordedAt);
 }
 
@@ -263,32 +363,37 @@ function validCoordinate(point: RoutePoint) {
 const maxSpeedMps = (type: ActivityType) => ({ WALK: 3.5, RUN: 8, HIKE: 4, RIDE: 22 })[type];
 
 function updateElevation(activity: LocalActivity, point: RoutePoint, secondsSincePrevious: number, horizontalDistanceM: number) {
-  if (point.altitude === null || !Number.isFinite(point.altitude)) return activity;
   const altitudeAccuracy = point.altitudeAccuracy;
-  const reliable = altitudeAccuracy !== undefined && altitudeAccuracy !== null
-    ? altitudeAccuracy <= 15
-    : (point.accuracy ?? Number.POSITIVE_INFINITY) <= 12;
-  if (!reliable) return activity;
+  const currentDiagnostics = diagnostics(activity);
+  const withAccuracy = {
+    ...activity,
+    trackingDiagnostics: {
+      ...currentDiagnostics,
+      lastAltitudeAccuracyM: altitudeAccuracy !== undefined && altitudeAccuracy !== null && Number.isFinite(altitudeAccuracy) ? altitudeAccuracy : null,
+    },
+  };
+  if (point.altitude === null || !Number.isFinite(point.altitude) || altitudeAccuracy === undefined || altitudeAccuracy === null || altitudeAccuracy > TRACKING_THRESHOLDS.altitudeAccuracyM) return withAccuracy;
+  if (horizontalDistanceM <= 0 || secondsSincePrevious <= 0) return withAccuracy;
+  const samples = [...(activity.altitudeSamplesM ?? []).slice(-4), point.altitude];
+  const filteredAltitude = median(samples);
   const previous = activity.currentElevationM;
-  if (previous === null || previous === undefined) return { ...activity, currentElevationM: point.altitude, elevationReferenceM: point.altitude };
-  // Altitude readings are much noisier than horizontal GPS. Only moving
-  // samples can change gain/loss, and reject changes that imply an impossible
-  // vertical jump for the horizontal distance travelled.
-  if (horizontalDistanceM < 8 || secondsSincePrevious <= 0) return activity;
-  if (Math.abs(point.altitude - previous) > Math.max(12, horizontalDistanceM * 0.8)) return activity;
-  const smoothed = previous * 0.75 + point.altitude * 0.25;
+  if (previous === null || previous === undefined) {
+    return { ...withAccuracy, altitudeSamplesM: samples, currentElevationM: filteredAltitude, elevationReferenceM: filteredAltitude };
+  }
+  if (Math.abs(filteredAltitude - previous) > Math.max(12, horizontalDistanceM * 0.8)) return withAccuracy;
+  const smoothed = previous * 0.7 + filteredAltitude * 0.3;
   const elevationReferenceM = activity.elevationReferenceM ?? previous;
   const delta = smoothed - elevationReferenceM;
-  const reportedAccuracy = altitudeAccuracy ?? point.accuracy ?? 12;
-  const noiseFloorM = Math.max(4, Math.min(8, reportedAccuracy * 0.5));
-  if (Math.abs(delta) / secondsSincePrevious > 1.5 || Math.abs(delta) / horizontalDistanceM > 0.45) return activity;
-  const crossedNoiseFloor = Math.abs(delta) >= noiseFloorM;
+  const noiseFloorM = Math.max(3, Math.min(8, altitudeAccuracy * 0.35));
+  if (Math.abs(delta) / secondsSincePrevious > 1.2 || Math.abs(delta) / horizontalDistanceM > 0.4) return withAccuracy;
+  const sustainedChange = Math.abs(delta) >= noiseFloorM && samples.length >= 3;
   return {
-    ...activity,
+    ...withAccuracy,
+    altitudeSamplesM: samples,
     currentElevationM: smoothed,
-    elevationReferenceM: crossedNoiseFloor ? smoothed : elevationReferenceM,
-    elevationGainM: (activity.elevationGainM ?? 0) + (delta >= 3 ? delta : 0),
-    elevationLossM: (activity.elevationLossM ?? 0) + (delta <= -3 ? Math.abs(delta) : 0),
+    elevationReferenceM: sustainedChange ? smoothed : elevationReferenceM,
+    elevationGainM: (activity.elevationGainM ?? 0) + (sustainedChange && delta > 0 ? delta : 0),
+    elevationLossM: (activity.elevationLossM ?? 0) + (sustainedChange && delta < 0 ? Math.abs(delta) : 0),
   };
 }
 
@@ -299,115 +404,155 @@ export function markGpsUnavailable(activity: LocalActivity, recordedAt: string):
     gpsAvailable: false,
     gpsAccuracyM: null,
     trackingMode: 'MOTION_ONLY',
-    currentPaceSPerKm: activity.paceSource === 'GPS' ? null : activity.currentPaceSPerKm,
-    paceSource: activity.paceSource === 'GPS' ? null : activity.paceSource,
+    currentPaceSPerKm: null,
+    currentSpeedKmh: null,
+    paceSource: null,
+    recentPaceSegments: [],
+    trackingDiagnostics: { ...diagnostics(activity), rollingPaceDistanceM: 0, rollingPaceDurationS: 0 },
     updatedAt: recordedAt,
   };
 }
 
+function recentPaceSegments(activity: LocalActivity, segment: PaceSegment) {
+  const cutoff = Date.parse(segment.recordedAt) - TRACKING_THRESHOLDS.rollingPaceWindowS * 1000;
+  return [...(activity.recentPaceSegments ?? []), segment].filter(item => Date.parse(item.recordedAt) >= cutoff);
+}
+
 export function recordGpsSample(activity: LocalActivity, point: RoutePoint, recordedAt = point.recordedAt): GpsSampleResult {
-  if (activity.status !== 'RECORDING' || !validCoordinate(point)) {
-    return { activity, accepted: false, moving: false, reason: 'INVALID' };
+  if (activity.status !== 'RECORDING') return { activity, accepted: false, moving: false, reason: 'INVALID' };
+  if (!validCoordinate(point)) return { activity: reject(activity, 'rejectedInvalidPoints'), accepted: false, moving: false, reason: 'INVALID' };
+  const pointTime = Date.parse(point.recordedAt);
+  const receivedTime = Date.parse(recordedAt);
+  if (Number.isFinite(receivedTime) && receivedTime - pointTime > TRACKING_THRESHOLDS.locationStaleMs) {
+    return { activity: reject(activity, 'rejectedStalePoints'), accepted: false, moving: false, reason: 'STALE' };
   }
   const accuracy = point.accuracy ?? Number.POSITIVE_INFINITY;
-  if (accuracy > TRACKING_THRESHOLDS.maxGpsAccuracyM) {
-    return { activity: markGpsUnavailable(activity, recordedAt), accepted: false, moving: false, reason: 'INACCURATE' };
+  if (accuracy > GPS_ACCURACY_LIMITS_M[activity.type]) {
+    const inaccurate = reject({ ...activity, gpsAccuracyM: Number.isFinite(accuracy) ? accuracy : null }, 'rejectedInaccuratePoints');
+    return { activity: inaccurate, accepted: false, moving: false, reason: 'INACCURATE' };
   }
 
-  const previous = activity.route.at(-1);
-  const recovering = activity.gpsAvailable === false;
+  const previous = activity.locationBaseline ?? activity.route.at(-1);
+  const recovering = activity.gpsAvailable === false && activity.route.length > 0;
   if (!previous || recovering) {
-    const baselinePoint = recovering && activity.route.length ? { ...point, startsNewSegment: true } : point;
-    const baseline = updateElevation({
+    const baselinePoint = recovering ? { ...point, startsNewSegment: true } : point;
+    const acceptedDiagnostics = diagnostics(activity);
+    const baseline = reconcileDistanceAndSteps({
       ...activity,
       route: [...activity.route, baselinePoint],
+      locationBaseline: point,
       gpsAvailable: true,
       gpsAccuracyM: accuracy,
       lastReliableGpsAt: point.recordedAt,
       trackingMode: 'GPS_MOTION',
-      gpsDistanceM: activity.distanceM,
-      sensorDistanceM: 0,
-      sensorDistanceOffsetM: activity.distanceM,
-      distanceSource: activity.steps ? 'FUSED' : 'GPS',
       currentPaceSPerKm: null,
+      currentSpeedKmh: null,
       paceSource: null,
+      recentPaceSegments: [],
+      trackingDiagnostics: {
+        ...acceptedDiagnostics,
+        acceptedGpsPoints: acceptedDiagnostics.acceptedGpsPoints + 1,
+        rollingPaceDistanceM: 0,
+        rollingPaceDurationS: 0,
+      },
       updatedAt: recordedAt,
-    }, baselinePoint, 0, 0);
-    return { activity: withDerivedMetrics(baseline), accepted: true, moving: false, reason: 'BASELINE' };
+    });
+    return { activity: refreshActivityMetrics(baseline), accepted: true, moving: false, reason: 'BASELINE' };
   }
 
-  const seconds = (Date.parse(point.recordedAt) - Date.parse(previous.recordedAt)) / 1000;
-  if (seconds <= 0) return { activity, accepted: false, moving: false, reason: 'STALE' };
+  const seconds = (pointTime - Date.parse(previous.recordedAt)) / 1000;
+  if (seconds <= 0) return { activity: reject(activity, 'rejectedStalePoints'), accepted: false, moving: false, reason: 'STALE' };
   const segmentM = distanceBetween(previous, point);
   const coordinateSpeed = segmentM / seconds;
   const reportedSpeed = point.speed !== null && point.speed >= 0 ? point.speed : null;
-  const jitterThresholdM = Math.max(3, Math.min(10, ((previous.accuracy ?? 20) + accuracy) * 0.3));
-  // Android browsers commonly report coords.speed as 0 even while coordinates
-  // are changing. Route acceptance must therefore use the filtered coordinate
-  // displacement; the optional reported speed is corroborating data only.
+  const jitterThresholdM = Math.max(3, Math.min(9, ((previous.accuracy ?? 20) + accuracy) * 0.28));
   if (coordinateSpeed > maxSpeedMps(activity.type) * 1.2 || (reportedSpeed !== null && reportedSpeed > maxSpeedMps(activity.type) * 1.5)) {
-    return { activity: { ...activity, gpsAccuracyM: accuracy }, accepted: false, moving: false, reason: 'IMPLAUSIBLE' };
+    const impossible = reject({ ...activity, gpsAccuracyM: accuracy }, 'rejectedImpossiblePoints');
+    return { activity: impossible, accepted: false, moving: false, reason: 'IMPLAUSIBLE' };
   }
 
   if (segmentM < jitterThresholdM || coordinateSpeed < 0.15) {
-    const keepHeartbeat = seconds >= TRACKING_THRESHOLDS.stationaryHeartbeatS;
+    const idleSeconds = activity.lastMovementAt ? (pointTime - Date.parse(activity.lastMovementAt)) / 1000 : Number.POSITIVE_INFINITY;
+    const stationaryDiagnostics = diagnostics(activity);
     const stationary: LocalActivity = {
       ...activity,
-      ...(keepHeartbeat ? { route: [...activity.route, point] } : {}),
+      locationBaseline: point,
       gpsAvailable: true,
       gpsAccuracyM: accuracy,
       lastReliableGpsAt: point.recordedAt,
       trackingMode: 'GPS_MOTION',
+      currentPaceSPerKm: idleSeconds >= TRACKING_THRESHOLDS.stationaryPaceTimeoutS ? null : activity.currentPaceSPerKm,
+      currentSpeedKmh: idleSeconds >= TRACKING_THRESHOLDS.stationaryPaceTimeoutS ? null : activity.currentSpeedKmh,
+      paceSource: idleSeconds >= TRACKING_THRESHOLDS.stationaryPaceTimeoutS ? null : activity.paceSource,
+      recentPaceSegments: idleSeconds >= TRACKING_THRESHOLDS.stationaryPaceTimeoutS ? [] : activity.recentPaceSegments,
+      trackingDiagnostics: {
+        ...stationaryDiagnostics,
+        rejectedStationaryPoints: stationaryDiagnostics.rejectedStationaryPoints + 1,
+        ...(idleSeconds >= TRACKING_THRESHOLDS.stationaryPaceTimeoutS ? { rollingPaceDistanceM: 0, rollingPaceDurationS: 0 } : {}),
+      },
       updatedAt: recordedAt,
     };
-    return { activity: withDerivedMetrics(stationary), accepted: keepHeartbeat, moving: false, reason: 'STATIONARY' };
+    return { activity: stationary, accepted: false, moving: false, reason: 'STATIONARY' };
   }
 
-  const withTime = advanceMovingTime(activity, recordedAt, seconds);
-  const gpsDistanceM = (activity.gpsDistanceM ?? activity.distanceM) + segmentM;
-  const rawPace = 1000 / (segmentM / seconds);
-  const nextPace = plausiblePace(activity.type, rawPace)
-    ? activity.paceSource === 'GPS' && activity.currentPaceSPerKm
-      ? activity.currentPaceSPerKm * 0.65 + rawPace * 0.35
-      : rawPace
+  const segments = recentPaceSegments(activity, { distanceM: segmentM, durationS: seconds, recordedAt: point.recordedAt });
+  const rollingDistanceM = segments.reduce((total, segment) => total + segment.distanceM, 0);
+  const rollingDurationS = segments.reduce((total, segment) => total + segment.durationS, 0);
+  const rawCurrentPace = rollingDurationS >= TRACKING_THRESHOLDS.rollingPaceMinimumDurationS && rollingDistanceM >= TRACKING_THRESHOLDS.rollingPaceMinimumDistanceM
+    ? rollingDurationS / (rollingDistanceM / 1000)
     : null;
-  const strideM = calibratedStrideM(
-    activity.type,
-    activity.gpsDistanceM ?? activity.distanceM,
-    activity.steps ?? 0,
-    activity.strideM ?? defaultStrideM(activity.type),
-  );
-  const moving = updateElevation({
-    ...withTime,
+  const currentPaceSPerKm = rawCurrentPace && plausiblePace(activity.type, rawCurrentPace)
+    ? activity.paceSource === 'GPS' && activity.currentPaceSPerKm
+      ? activity.currentPaceSPerKm * 0.7 + rawCurrentPace * 0.3
+      : rawCurrentPace
+    : null;
+  const rawCurrentSpeedKmh = rollingDurationS >= TRACKING_THRESHOLDS.rollingPaceMinimumDurationS && rollingDistanceM >= TRACKING_THRESHOLDS.rollingPaceMinimumDistanceM
+    ? rollingDistanceM / rollingDurationS * 3.6
+    : null;
+  const currentSpeedKmh = activity.type === 'RIDE' && rawCurrentSpeedKmh
+    ? activity.currentSpeedKmh
+      ? activity.currentSpeedKmh * 0.7 + rawCurrentSpeedKmh * 0.3
+      : rawCurrentSpeedKmh
+    : null;
+  const gpsDistanceM = (activity.gpsDistanceM ?? 0) + segmentM;
+  const acceptedDiagnostics = diagnostics(activity);
+  const movingBase = reconcileDistanceAndSteps({
+    ...advanceMovingTime(activity, recordedAt, seconds),
     route: [...activity.route, point],
-    distanceM: gpsDistanceM,
+    locationBaseline: point,
     gpsDistanceM,
-    strideM,
-    distanceSource: activity.steps ? 'FUSED' : 'GPS',
-    currentPaceSPerKm: nextPace,
-    paceSource: nextPace ? 'GPS' : null,
+    currentPaceSPerKm,
+    currentSpeedKmh,
+    paceSource: currentPaceSPerKm ? 'GPS' : null,
     gpsAvailable: true,
     gpsAccuracyM: accuracy,
     lastReliableGpsAt: point.recordedAt,
     trackingMode: 'GPS_MOTION',
+    recentPaceSegments: segments,
+    trackingDiagnostics: {
+      ...acceptedDiagnostics,
+      acceptedGpsPoints: acceptedDiagnostics.acceptedGpsPoints + 1,
+      rollingPaceDistanceM: rollingDistanceM,
+      rollingPaceDurationS: rollingDurationS,
+    },
     updatedAt: recordedAt,
-  }, point, seconds, segmentM);
-  return { activity: withDerivedMetrics(moving), accepted: true, moving: true, reason: 'ACCEPTED' };
+  });
+  const moving = updateElevation(movingBase, point, seconds, segmentM);
+  return { activity: refreshActivityMetrics(moving), accepted: true, moving: true, reason: 'ACCEPTED' };
 }
 
 export function recordGpsSegment(activity: LocalActivity, segmentM: number, recordedAt: string): LocalActivity {
-  const gpsDistanceM = (activity.gpsDistanceM ?? activity.distanceM) + segmentM;
-  return withDerivedMetrics({
-    ...advanceMovingTime(activity, recordedAt, segmentM > 0 ? 1 : 0),
-    gpsDistanceM,
-    distanceM: gpsDistanceM,
-    distanceSource: activity.steps ? 'FUSED' : 'GPS',
+  if (activity.status !== 'RECORDING' || segmentM <= 0) return activity;
+  const updated = reconcileDistanceAndSteps({
+    ...advanceMovingTime(activity, recordedAt, 1),
+    gpsDistanceM: (activity.gpsDistanceM ?? 0) + segmentM,
     gpsAvailable: true,
     trackingMode: 'GPS_MOTION',
     updatedAt: recordedAt,
   });
+  return refreshActivityMetrics(updated);
 }
 
 export function distanceSourceLabel(activity: LocalActivity) {
-  return ({ GPS: 'GPS', MOTION: 'Motion estimate', FUSED: 'GPS + motion', NONE: 'Timer only' })[activity.distanceSource ?? (activity.route.length ? 'GPS' : 'NONE')];
+  return ({ GPS: 'GPS', MOTION: 'Motion estimate', FUSED: 'GPS + motion estimate', NONE: 'Timer only' })[activity.distanceSource ?? (displayedDistance(activity) > 0 ? 'GPS' : 'NONE')];
 }

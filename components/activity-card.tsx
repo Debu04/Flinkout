@@ -65,9 +65,8 @@ export function ActivityCard({ initial }: { initial: SocialActivity }) {
   const saved = state.savedActivityIds.includes(activity.id);
   const hidden = state.hiddenActivityIds.includes(activity.id);
   const paceType = activity.type !== 'RIDE';
-  const movingTimeS = activity.movingTimeS || activity.durationS;
-  const averagePaceSPerKm = activity.averagePaceSPerKm ?? (activity.distanceM > 0 ? movingTimeS / (activity.distanceM / 1000) : null);
-  const metric = paceType ? formatPaceSeconds(averagePaceSPerKm) : `${averageSpeedKmh(activity.distanceM, movingTimeS).toFixed(1)} km/h`;
+  const averagePaceSPerKm = activity.averagePaceSPerKm ?? (activity.distanceM > 0 ? activity.durationS / (activity.distanceM / 1000) : null);
+  const metric = paceType ? formatPaceSeconds(averagePaceSPerKm) : `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h`;
   const content = contentFor(activity);
 
   async function toggleReaction() {

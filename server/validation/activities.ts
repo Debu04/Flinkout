@@ -21,6 +21,7 @@ export const syncActivitySchema = z.object({
   movingTimeS: z.number().int().nonnegative().max(86_400).default(0),
   distanceM: z.number().nonnegative().max(2_000_000),
   steps: z.number().int().nonnegative().max(200_000).default(0),
+  stepSource: z.enum(['NATIVE', 'GPS_MOTION_ESTIMATED', 'BROWSER_ESTIMATED', 'UNAVAILABLE']).default('UNAVAILABLE'),
   averagePaceSPerKm: z.number().positive().max(7_200).nullable().default(null),
   caloriesKcal: z.number().nonnegative().max(20_000).default(0),
   currentElevationM: z.number().gte(-500).lte(10_000).nullable().default(null),

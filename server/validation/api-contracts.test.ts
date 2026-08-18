@@ -13,6 +13,7 @@ const activity = {
   movingTimeS: 285,
   distanceM: 1000,
   steps: 1150,
+  stepSource: 'GPS_MOTION_ESTIMATED',
   averagePaceSPerKm: 285,
   caloriesKcal: 52.4,
   currentElevationM: 124.3,
@@ -32,9 +33,9 @@ const activity = {
 describe('activity sync API contract', () => {
   it('accepts complete and legacy local activity payloads', () => {
     expect(syncActivitySchema.safeParse(activity).success).toBe(true);
-    const legacy = syncActivitySchema.safeParse({ ...activity, steps: undefined, movingTimeS: undefined, averagePaceSPerKm: undefined, caloriesKcal: undefined, currentElevationM: undefined, elevationGainM: undefined, elevationLossM: undefined, distanceSource: undefined });
+    const legacy = syncActivitySchema.safeParse({ ...activity, steps: undefined, stepSource: undefined, movingTimeS: undefined, averagePaceSPerKm: undefined, caloriesKcal: undefined, currentElevationM: undefined, elevationGainM: undefined, elevationLossM: undefined, distanceSource: undefined });
     expect(legacy.success).toBe(true);
-    if (legacy.success) expect(legacy.data).toMatchObject({ steps: 0, movingTimeS: 0, averagePaceSPerKm: null, caloriesKcal: 0, currentElevationM: null, elevationGainM: 0, elevationLossM: 0, distanceSource: 'NONE' });
+    if (legacy.success) expect(legacy.data).toMatchObject({ steps: 0, stepSource: 'UNAVAILABLE', movingTimeS: 0, averagePaceSPerKm: null, caloriesKcal: 0, currentElevationM: null, elevationGainM: 0, elevationLossM: 0, distanceSource: 'NONE' });
   });
 
   it('rejects malformed coordinates, reversed times, and oversized routes', () => {

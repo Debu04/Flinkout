@@ -27,6 +27,7 @@ export type SocialActivity = {
   movingTimeS?: number;
   distanceM: number;
   steps?: number;
+  stepSource?: 'NATIVE' | 'GPS_MOTION_ESTIMATED' | 'BROWSER_ESTIMATED' | 'UNAVAILABLE';
   averagePaceSPerKm?: number | null;
   caloriesKcal?: number;
   currentElevationM?: number | null;
