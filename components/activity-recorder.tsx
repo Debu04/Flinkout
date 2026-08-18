@@ -645,6 +645,9 @@ export function ActivityRecorder() {
         setContinuityWarning('');
         setGps(`GPS ready (+/-${Math.round(position.coords.accuracy)} m)`);
       } else if (result.reason === 'STATIONARY') {
+        // Keep the live marker responsive without writing GPS drift into the
+        // recorded route or changing the accepted distance baseline.
+        setMapPosition(routePoint);
         setLocationAccess('GRANTED');
         setGps(`GPS ready (+/-${Math.round(position.coords.accuracy)} m)`);
       } else if (result.reason === 'IMPLAUSIBLE' || result.reason === 'STALE') {
@@ -856,8 +859,8 @@ export function ActivityRecorder() {
       elevationGainM: 0,
       elevationLossM: 0,
       altitudeSamplesM: [],
-      trackingMode: 'MOTION_ONLY',
-      gpsAvailable: false,
+      trackingMode: 'GPS_MOTION',
+      gpsAvailable: undefined,
       gpsAccuracyM: null,
       lastReliableGpsAt: null,
       lastSensorAt: null,
@@ -1119,13 +1122,13 @@ export function ActivityRecorder() {
   const distance = `${motionEstimateActive ? '~' : ''}${formatDistance(activity?.distanceM ?? 0)}`;
   const calories = `~${Math.round(activity?.caloriesKcal ?? 0)} kcal`;
   const nativeStepMode = activity?.stepSource === 'NATIVE';
-  const stepsUnavailable = !nativeStepMode && !(activity?.gpsDistanceM ?? 0) && !(activity?.browserMotionSteps ?? 0) && !(activity?.steps ?? 0);
+  const stepsUnavailable = !nativeStepMode && activity?.stepSource === 'UNAVAILABLE' && !(activity.steps ?? 0);
   const steps = stepsUnavailable ? '--' : `${nativeStepMode ? '' : '~'}${(activity?.steps ?? 0).toLocaleString()}`;
   const sourceLine = activity?.status === 'PAUSED'
     ? 'Tracking paused'
     : activity?.type === 'RIDE'
       ? `${activity.gpsAvailable ? 'GPS distance' : 'GPS waiting'} • Average speed`
-      : `${motionEstimateActive ? 'Estimated distance' : activity?.gpsAvailable ? 'GPS distance' : 'Distance waiting'} • ${nativeStepMode ? 'Device steps' : 'Estimated steps'} • ${motionEstimateActive ? 'Estimated pace' : activity?.gpsAvailable ? 'GPS pace' : 'Pace waiting'}`;
+      : `${motionEstimateActive ? 'Estimated distance' : activity?.gpsAvailable ? 'GPS distance' : 'Distance waiting'} • ${nativeStepMode ? 'Device steps' : stepsUnavailable ? 'Steps waiting' : 'Estimated steps'} • ${motionEstimateActive ? 'Estimated pace' : activity?.gpsAvailable ? 'GPS pace' : 'Pace waiting'}`;
   const trackingSource = nativeStepMode ? 'Device steps' : activity?.stepSource === 'GPS_MOTION_ESTIMATED' ? 'Estimated from distance and phone motion' : activity?.stepSource === 'BROWSER_ESTIMATED' ? 'Estimated from phone motion' : 'Unavailable';
   const activityDiagnostics = activity?.trackingDiagnostics;
   const diagnosticRows: Array<[string, string | number]> = activity ? [

@@ -166,6 +166,51 @@ describe('authoritative GPS and fused metric pipeline', () => {
     expect(third.activity.distanceM).toBeCloseTo(20, 0);
   });
 
+  it('does not reject plausible coordinate movement because browser-reported speed is wrong', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z', { speed: 0 })).activity;
+    const moved = recordGpsSample(first, pointAt(10, '2026-08-08T10:00:10.000Z', { speed: 40 }));
+    expect(moved.reason).toBe('ACCEPTED');
+    expect(moved.activity.distanceM).toBeCloseTo(10, 0);
+  });
+
+  it('accumulates ordinary one-metre walking callbacks instead of rebasing them away', () => {
+    let tracked = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z', { speed: 0 })).activity;
+    for (let second = 1; second <= 30; second += 1) {
+      tracked = recordGpsSample(
+        tracked,
+        pointAt(second, `2026-08-08T10:00:${String(second).padStart(2, '0')}.000Z`, { speed: 0 }),
+      ).activity;
+    }
+    expect(tracked.route.length).toBeGreaterThan(5);
+    expect(tracked.distanceM).toBeGreaterThan(25);
+    expect(tracked.steps).toBeGreaterThan(35);
+    expect(tracked.movingTimeS).toBeGreaterThan(20);
+    expect(tracked.caloriesKcal).toBeGreaterThan(0);
+  });
+
+  it('accepts usable Android GPS fixes above the old overly strict limit', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z', { accuracy: 35 })).activity;
+    const moved = recordGpsSample(first, pointAt(15, '2026-08-08T10:00:15.000Z', { accuracy: 35 }));
+    expect(moved.reason).toBe('ACCEPTED');
+    expect(moved.activity.distanceM).toBeCloseTo(15, 0);
+  });
+
+  it('does not invent fallback distance while the initial GPS fix is still pending', () => {
+    const acquiring = activity({ gpsAvailable: undefined, trackingMode: 'GPS_MOTION' });
+    const motionWhileAcquiring = recordMotionSteps(acquiring, 10, 100, '2026-08-08T10:00:06.000Z');
+    expect(motionWhileAcquiring.browserMotionSteps).toBe(10);
+    expect(motionWhileAcquiring.motionFallbackDistanceM).toBe(0);
+    expect(motionWhileAcquiring.distanceM).toBe(0);
+    expect(motionWhileAcquiring.steps).toBe(0);
+    expect(motionWhileAcquiring.stepSource).toBe('UNAVAILABLE');
+
+    const confirmedOutage = markGpsUnavailable(motionWhileAcquiring, '2026-08-08T10:00:07.000Z');
+    const fallback = recordMotionSteps(confirmedOutage, 5, 100, '2026-08-08T10:00:10.000Z');
+    expect(fallback.motionFallbackDistanceM).toBeCloseTo(3.25, 5);
+    expect(fallback.steps).toBe(5);
+    expect(fallback.stepSource).toBe('BROWSER_ESTIMATED');
+  });
+
   it('continues fallback distance during GPS loss and starts a clean recovery segment', () => {
     const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
     const moved = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
@@ -234,6 +279,16 @@ describe('authoritative GPS and fused metric pipeline', () => {
     const climbed = recordGpsSample(altitude3, pointAt(80, '2026-08-08T10:01:00.000Z', { altitude: 118, altitudeAccuracy: 5 })).activity;
     expect(climbed.elevationGainM).toBeGreaterThan(3);
     expect(climbed.elevationLossM ?? 0).toBe(0);
+  });
+
+  it('uses altitude conservatively when a precise Android fix omits vertical accuracy', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const altitude1 = recordGpsSample(first, pointAt(20, '2026-08-08T10:00:15.000Z', { altitude: 100, altitudeAccuracy: null, accuracy: 5 })).activity;
+    const altitude2 = recordGpsSample(altitude1, pointAt(40, '2026-08-08T10:00:30.000Z', { altitude: 110, altitudeAccuracy: null, accuracy: 5 })).activity;
+    const altitude3 = recordGpsSample(altitude2, pointAt(60, '2026-08-08T10:00:45.000Z', { altitude: 120, altitudeAccuracy: null, accuracy: 5 })).activity;
+    const climbed = recordGpsSample(altitude3, pointAt(80, '2026-08-08T10:01:00.000Z', { altitude: 130, altitudeAccuracy: null, accuracy: 5 })).activity;
+    expect(climbed.trackingDiagnostics?.lastAltitudeAccuracyM).toBe(20);
+    expect(climbed.elevationGainM).toBeGreaterThan(3);
   });
 
   it('does not change any active metrics while paused', () => {
