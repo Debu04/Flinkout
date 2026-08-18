@@ -131,8 +131,9 @@ export function ActivityDetail({ id }: { id: string }) {
   };
   const displayReactionCount = activity.reactionCount + (isPreview ? Number(reacted) - Number(activity.reactedByViewer) : 0);
   const movingTimeS = activity.movingTimeS || activity.durationS;
-  const averagePaceSPerKm = activity.averagePaceSPerKm ?? (activity.distanceM > 0 ? movingTimeS / (activity.distanceM / 1000) : null);
-  const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, movingTimeS).toFixed(1)} km/h` : formatPaceSeconds(averagePaceSPerKm);
+  const averagePaceSPerKm = activity.averagePaceSPerKm ?? (activity.distanceM > 0 ? activity.durationS / (activity.distanceM / 1000) : null);
+  const movingPaceMetric = formatPaceSeconds(activity.distanceM > 0 ? movingTimeS / (activity.distanceM / 1000) : null);
+  const speedMetric = activity.type === 'RIDE' ? `${averageSpeedKmh(activity.distanceM, activity.durationS).toFixed(1)} km/h` : formatPaceSeconds(averagePaceSPerKm);
   const timeline: ActivityTimelineEvent[] = activity.timeline?.length ? activity.timeline : [
     { id: `${activity.id}-start`, type: 'START', source: 'ACTIVITY', createdAt: activity.startedAt },
     ...(activity.endedAt ? [{ id: `${activity.id}-finish`, type: 'FINISH' as const, source: 'ACTIVITY' as const, createdAt: activity.endedAt }] : []),
@@ -147,7 +148,7 @@ export function ActivityDetail({ id }: { id: string }) {
 
   return <section className="session-detail-page">
     <header className="standalone-mobile-header"><button onClick={() => router.back()} aria-label="Back">Back</button><strong>Activity</strong><button aria-label="Share activity" onClick={() => void share({ title: `${metadata.title} on Flinkout`, text: metadata.description })}><UiIcon name="share" /></button></header>
-    <div className="session-map-hero">{activity.route?.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state detail-route-empty"><UiIcon name="map" size={32} /><strong>No GPS route was recorded</strong><span>{activity.steps ? `${activity.steps.toLocaleString()} steps were captured using phone motion sensors.` : 'This activity includes time and movement metrics only.'}</span></div>}<div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
+    <div className="session-map-hero">{activity.route?.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state detail-route-empty"><UiIcon name="map" size={32} /><strong>No GPS route was recorded</strong><span>{activity.steps ? `${activity.steps.toLocaleString()} ${activity.stepSource === 'NATIVE' ? 'device steps' : 'estimated steps'} were captured from movement.` : 'This activity includes time and movement metrics only.'}</span></div>}<div className="map-summary-pills"><span><UiIcon name="activity" /><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><UiIcon name="activity" /><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span></div></div>
     <div className="session-detail-grid">
       <main>
         <section className="session-title-card"><div className="avatar small">{activity.user.profile?.displayName?.[0] ?? activity.user.username[0]}</div><div><h1>{metadata.title}</h1><p>by <Link href={`/u/${activity.user.username}`}>{activity.user.profile?.displayName ?? activity.user.username}</Link> - {metadata.location}</p></div><span>#{metadata.tags[0]}</span></section>
@@ -162,6 +163,6 @@ export function ActivityDetail({ id }: { id: string }) {
         {error && <p className="error" role="alert">{error}</p>}
       </aside>
     </div>
-    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Average speed' : 'Average pace'}</small><strong>{speedMetric}</strong></span><span><small>{activity.type === 'RIDE' ? 'Calories' : 'Steps'}</small><strong>{activity.type === 'RIDE' ? `${Math.round(activity.caloriesKcal ?? 0)} kcal` : (activity.steps ?? 0).toLocaleString()}</strong></span></div></section>
+    <section className="desktop-session-summary"><h2>{metadata.title}</h2><p>{new Date(activity.startedAt).toLocaleString()} - {metadata.location}</p><div><span><small>Distance - {sourceLabel(activity)}</small><strong>{formatDistance(activity.distanceM)}</strong></span><span><small>Duration</small><strong>{formatDuration(activity.durationS)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Average speed' : `Average pace • moving ${movingPaceMetric}`}</small><strong>{speedMetric}</strong></span><span><small>{activity.type === 'RIDE' ? 'Estimated calories' : activity.stepSource === 'NATIVE' ? 'Device steps' : 'Estimated steps'}</small><strong>{activity.type === 'RIDE' ? `~${Math.round(activity.caloriesKcal ?? 0)} kcal` : `${activity.stepSource === 'NATIVE' ? '' : '~'}${(activity.steps ?? 0).toLocaleString()}`}</strong></span></div></section>
   </section>;
 }

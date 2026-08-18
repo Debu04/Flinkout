@@ -1,9 +1,10 @@
 # Android tracking wrapper
 
-Flinkout's browser/PWA build continues to use browser geolocation and labels
-DeviceMotion step values as estimates. The Android wrapper adds the platform
-step counter/detector and the Android physical-activity permission without
-changing the recorder UI.
+Flinkout's browser/PWA build estimates steps from accepted GPS distance and a
+fixed activity-specific stride. Browser DeviceMotion confirms cadence and
+covers short GPS gaps; those web values are labelled as estimates. The Android
+wrapper instead makes the platform step counter/detector authoritative and adds
+the Android physical-activity permission without changing the recorder layout.
 
 ## Prerequisites
 

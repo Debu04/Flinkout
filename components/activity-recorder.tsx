@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ACTIVITY_TYPES, averageSpeedKmh, elapsedSeconds, formatDistance, formatDuration, formatPaceSeconds, labelFor, type ActivityType, type LocalActivity, type RoutePoint } from '../lib/activity';
-import { detectStep, distanceSourceLabel, initialStepDetectorState, markGpsUnavailable, recordGpsSample, recordMotionSteps } from '../lib/activity-motion';
+import { averageMovingPaceSeconds, averagePaceSeconds, detectStep, distanceSourceLabel, initialStepDetectorState, markGpsUnavailable, recordGpsSample, recordMotionSteps, refreshActivityMetrics } from '../lib/activity-motion';
 import { deleteActivity, getIncompleteActivity, putActivity } from '../lib/activity-db';
 import { syncActivity, syncPendingActivities } from '../lib/activity-sync';
 import { api, type ActivityTimelineEvent, type LiveActivity, type SocialActivity } from '../lib/api';
@@ -21,6 +21,8 @@ type DeviceAccessState = 'CHECKING' | 'PROMPT' | 'REQUESTING' | 'GRANTED' | 'DEN
 type MotionPermissionConstructor = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 type LinearSensor = EventTarget & { x: number | null; y: number | null; z: number | null; start: () => void; stop: () => void };
 type LinearSensorConstructor = new (options: { frequency: number }) => LinearSensor;
+type WakeLockSentinelLike = EventTarget & { released: boolean; release: () => Promise<void> };
+type WakeLockNavigator = Navigator & { wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinelLike> } };
 type PolicyAwareDocument = Document & {
   permissionsPolicy?: { allowsFeature: (feature: string) => boolean };
   featurePolicy?: { allowsFeature: (feature: string) => boolean };
@@ -34,9 +36,10 @@ function policyAllows(feature: 'geolocation' | 'accelerometer' | 'gyroscope') {
 }
 
 function instantaneousSpeed(activity: LocalActivity) {
+  if (activity.currentSpeedKmh) return activity.currentSpeedKmh;
   if (activity.currentPaceSPerKm) return 3_600 / activity.currentPaceSPerKm;
   const latest = activity.route.at(-1)?.speed;
-  return latest !== null && latest !== undefined && latest >= 0 ? latest * 3.6 : averageSpeedKmh(activity.distanceM, activity.movingTimeS ?? 0);
+  return latest !== null && latest !== undefined && latest > 0 ? latest * 3.6 : averageSpeedKmh(activity.distanceM, activity.movingTimeS ?? 0);
 }
 
 function routePointFromPosition(position: GeolocationPosition): RoutePoint {
@@ -73,6 +76,9 @@ export function ActivityRecorder() {
   const [motionStatus, setMotionStatus] = useState<MotionStatus>('IDLE');
   const [motionSource, setMotionSource] = useState<MotionSource>('NONE');
   const [motionMessage, setMotionMessage] = useState('Motion sensors will be checked when you start.');
+  const [motionSampleRateHz, setMotionSampleRateHz] = useState(0);
+  const [continuityWarning, setContinuityWarning] = useState('');
+  const [wakeLockActive, setWakeLockActive] = useState(false);
   const [mapPosition, setMapPosition] = useState<RoutePoint>();
   const [online, setOnline] = useState(true);
   const [elapsed, setElapsed] = useState(0);
@@ -102,6 +108,8 @@ export function ActivityRecorder() {
   const motionPermissionRequestRef = useRef<Promise<boolean> | undefined>(undefined);
   const motionRunningRef = useRef(false);
   const nativeStepReadingRef = useRef<Pick<NativeStepReading, 'steps' | 'stepTimestamp'>>({ steps: 0, stepTimestamp: 0 });
+  const motionSampleStatsRef = useRef({ startedAt: 0, samples: 0 });
+  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null);
   const locationSeedRef = useRef<GeolocationPosition | undefined>(undefined);
 
   const checkStorage = useCallback(async () => {
@@ -147,6 +155,7 @@ export function ActivityRecorder() {
       removeEventListener('offline', update);
       if (watchId.current !== undefined) navigator.geolocation?.clearWatch(watchId.current);
       motionCleanupRef.current?.();
+      void wakeLockRef.current?.release();
     };
   }, [checkStorage]);
 
@@ -227,6 +236,67 @@ export function ActivityRecorder() {
     });
   }, []);
 
+  const releaseWakeLock = useCallback(() => {
+    const sentinel = wakeLockRef.current;
+    wakeLockRef.current = null;
+    setWakeLockActive(false);
+    if (sentinel && !sentinel.released) void sentinel.release().catch(() => undefined);
+  }, []);
+
+  const requestWakeLock = useCallback(async () => {
+    const wakeLock = (navigator as WakeLockNavigator).wakeLock;
+    if (!wakeLock || document.visibilityState !== 'visible' || activityRef.current?.status !== 'RECORDING') return;
+    try {
+      const sentinel = await wakeLock.request('screen');
+      wakeLockRef.current = sentinel;
+      setWakeLockActive(true);
+      sentinel.addEventListener('release', () => {
+        if (wakeLockRef.current === sentinel) wakeLockRef.current = null;
+        setWakeLockActive(false);
+      }, { once: true });
+    } catch {
+      setWakeLockActive(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activity?.status !== 'RECORDING') {
+      releaseWakeLock();
+      setContinuityWarning('');
+      return;
+    }
+    void requestWakeLock();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        setContinuityWarning('Browser tracking may pause in the background. Keep Flinkout visible for the most reliable route.');
+        releaseWakeLock();
+      } else {
+        setContinuityWarning('Flinkout is visible again. GPS is checking route continuity; no missing path is invented.');
+        void requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [activity?.status, releaseWakeLock, requestWakeLock]);
+
+  useEffect(() => {
+    if (activity?.status !== 'RECORDING') return;
+    const timer = setInterval(() => {
+      const current = activityRef.current;
+      if (!current || current.status !== 'RECORDING') return;
+      let next = current;
+      if (current.lastMovementAt && Date.now() - Date.parse(current.lastMovementAt) >= 10_000 && (current.currentPaceSPerKm || current.currentSpeedKmh)) {
+        next = { ...next, currentPaceSPerKm: null, currentSpeedKmh: null, paceSource: null, recentPaceSegments: [], trackingDiagnostics: current.trackingDiagnostics ? { ...current.trackingDiagnostics, rollingPaceDistanceM: 0, rollingPaceDurationS: 0 } : current.trackingDiagnostics, updatedAt: now() };
+      }
+      if (current.gpsAvailable && current.lastReliableGpsAt && Date.now() - Date.parse(current.lastReliableGpsAt) >= 20_000) {
+        next = markGpsUnavailable(next, now());
+        setGps('GPS unavailable — steps and distance are currently estimated.');
+      }
+      if (next !== current) persist(next);
+    }, 2_000);
+    return () => clearInterval(timer);
+  }, [activity?.clientId, activity?.status, persist]);
+
   const requestLocationAccess = useCallback(() => new Promise<boolean>(resolve => {
     if (!window.isSecureContext) {
       setSecureContext('INSECURE');
@@ -251,7 +321,6 @@ export function ActivityRecorder() {
     setGps('Waiting for location permission...');
     navigator.geolocation.getCurrentPosition(position => {
       locationSeedRef.current = position;
-      setMapPosition(routePointFromPosition(position));
       setLocationAccess('GRANTED');
       setGps(`Location access granted (+/-${Math.round(position.coords.accuracy)} m).`);
       resolve(true);
@@ -343,6 +412,8 @@ export function ActivityRecorder() {
     motionCleanupRef.current = undefined;
     motionRunningRef.current = false;
     nativeStepReadingRef.current = { steps: 0, stepTimestamp: 0 };
+    motionSampleStatsRef.current = { startedAt: 0, samples: 0 };
+    setMotionSampleRateHz(0);
   }, []);
 
   const beginMotionSensors = useCallback(async (type: ActivityType, requestPermission: boolean) => {
@@ -371,7 +442,9 @@ export function ActivityRecorder() {
           if (!current || current.status !== 'RECORDING') return;
           const elapsedMs = previous.stepTimestamp > 0 ? reading.stepTimestamp - previous.stepTimestamp : 0;
           const measuredCadence = elapsedMs > 0 ? count * 60_000 / elapsedMs : 0;
-          const cadence = measuredCadence >= 30 && measuredCadence <= 240 ? measuredCadence : current.cadenceSpm || 100;
+          const minimumCadence = type === 'RUN' ? 120 : 45;
+          const maximumCadence = type === 'RUN' ? 240 : 180;
+          const cadence = measuredCadence >= minimumCadence && measuredCadence <= maximumCadence ? measuredCadence : current.cadenceSpm || (type === 'RUN' ? 165 : 100);
           const recordedAt = new Date(reading.stepTimestamp || Date.now()).toISOString();
           persist(recordMotionSteps(current, count, cadence, recordedAt, 'NATIVE'));
         });
@@ -425,10 +498,19 @@ export function ActivityRecorder() {
     const acceptSample = (x: number | null, y: number | null, z: number | null, includesGravity: boolean, timestamp: number, rotationRate?: number | null) => {
       if (x === null || y === null || z === null) return;
       sampleSeen = true;
+      const sampleStats = motionSampleStatsRef.current;
+      const sampleNow = performance.now();
+      if (!sampleStats.startedAt) sampleStats.startedAt = sampleNow;
+      sampleStats.samples += 1;
+      const sampleWindowMs = sampleNow - sampleStats.startedAt;
+      if (sampleWindowMs >= 1_000) {
+        setMotionSampleRateHz(Math.round(sampleStats.samples * 1_000 / sampleWindowMs * 10) / 10);
+        motionSampleStatsRef.current = { startedAt: sampleNow, samples: 0 };
+      }
       setMotionSource('BROWSER_ESTIMATED');
       setMotionStatus('ACTIVE');
-      setMotionMessage('Browser motion estimate active. Step values are estimated, not Android hardware step-counter readings.');
-      const result = detectStep(motionDetectorRef.current, { x, y, z, includesGravity, timestamp, rotationRate });
+      setMotionMessage('Phone motion is helping estimate cadence and cover short GPS gaps.');
+      const result = detectStep(motionDetectorRef.current, { x, y, z, includesGravity, timestamp, rotationRate }, type);
       motionDetectorRef.current = result.state;
       const current = activityRef.current;
       if (current?.status === 'RECORDING') {
@@ -553,14 +635,20 @@ export function ActivityRecorder() {
       const result = recordGpsSample(current, routePoint, now());
       if (result.reason === 'INACCURATE') {
         persist(result.activity);
-        setGps(`GPS signal weak (+/-${Math.round(position.coords.accuracy)} m) - motion tracking continues.`);
+        setGps('GPS signal weak — route and GPS distance are waiting for a reliable point.');
         return;
       }
       if (result.activity !== current) persist(result.activity);
-      if (result.activity.gpsAvailable) {
-        setMapPosition(routePoint);
+      if (result.accepted) {
+        setMapPosition(result.activity.route.at(-1));
+        setLocationAccess('GRANTED');
+        setContinuityWarning('');
+        setGps(`GPS ready (+/-${Math.round(position.coords.accuracy)} m)`);
+      } else if (result.reason === 'STATIONARY') {
         setLocationAccess('GRANTED');
         setGps(`GPS ready (+/-${Math.round(position.coords.accuracy)} m)`);
+      } else if (result.reason === 'IMPLAUSIBLE' || result.reason === 'STALE') {
+        setGps('GPS point ignored while Flinkout waits for a consistent location.');
       }
     }, error => {
       if (error.code === error.PERMISSION_DENIED) setLocationAccess('DENIED');
@@ -569,9 +657,9 @@ export function ActivityRecorder() {
       setGps(error.code === error.PERMISSION_DENIED
         ? 'GPS permission was denied. Enable location access to record a route.'
         : error.code === error.POSITION_UNAVAILABLE
-          ? 'GPS signal lost - motion tracking continues.'
-          : 'GPS is taking too long - motion tracking continues while retrying.');
-    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
+          ? 'GPS unavailable — steps and distance are currently estimated.'
+          : 'GPS is taking too long — Flinkout is waiting for a reliable point.');
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 1_000 });
   }, [persist]);
 
   useEffect(() => {
@@ -745,25 +833,47 @@ export function ActivityRecorder() {
       lastMovementAt: null,
       distanceM: 0,
       gpsDistanceM: 0,
+      motionFallbackDistanceM: 0,
       sensorDistanceM: 0,
       sensorDistanceOffsetM: 0,
       steps: 0,
+      nativeSteps: 0,
+      browserMotionSteps: 0,
+      gpsEstimatedSteps: 0,
+      motionFallbackSteps: 0,
       stepSource: 'UNAVAILABLE',
       cadenceSpm: 0,
+      strideM: ({ WALK: 0.65, RUN: 1, HIKE: 0.62, RIDE: 0 })[selected],
       distanceSource: 'NONE',
       currentPaceSPerKm: null,
+      currentSpeedKmh: null,
       averagePaceSPerKm: null,
+      averageMovingPaceSPerKm: null,
       paceSource: null,
       caloriesKcal: 0,
       currentElevationM: null,
       elevationReferenceM: null,
       elevationGainM: 0,
       elevationLossM: 0,
+      altitudeSamplesM: [],
       trackingMode: 'MOTION_ONLY',
       gpsAvailable: false,
       gpsAccuracyM: null,
       lastReliableGpsAt: null,
       lastSensorAt: null,
+      locationBaseline: null,
+      recentPaceSegments: [],
+      trackingDiagnostics: {
+        acceptedGpsPoints: 0,
+        rejectedInaccuratePoints: 0,
+        rejectedStationaryPoints: 0,
+        rejectedImpossiblePoints: 0,
+        rejectedStalePoints: 0,
+        rejectedInvalidPoints: 0,
+        rollingPaceDistanceM: 0,
+        rollingPaceDurationS: 0,
+        lastAltitudeAccuracyM: null,
+      },
       route: [],
       liveRequested: wantsLive,
       liveSessionId: null,
@@ -788,7 +898,7 @@ export function ActivityRecorder() {
         const routePoint = routePointFromPosition(seed);
         const result = recordGpsSample(current, routePoint, now());
         persist(result.activity);
-        if (result.activity.gpsAvailable) setMapPosition(routePoint);
+        if (result.accepted) setMapPosition(result.activity.route.at(-1));
       });
 
       if (motionPermission) {
@@ -819,7 +929,10 @@ export function ActivityRecorder() {
     if (current.status === 'RECORDING') {
       stopWatch();
       stopMotionSensors();
-      persist({ ...current, status: 'PAUSED', trackingMode: 'PAUSED', elapsedBeforePauseS: elapsedSeconds(current), activeSince: null, lastMovementAt: null, currentPaceSPerKm: null, updatedAt: now() });
+      releaseWakeLock();
+      const pausedAt = now();
+      const activeElapsedS = elapsedSeconds(current);
+      persist(refreshActivityMetrics({ ...current, status: 'PAUSED', trackingMode: 'PAUSED', elapsedBeforePauseS: activeElapsedS, activeSince: null, lastMovementAt: null, currentPaceSPerKm: null, currentSpeedKmh: null, paceSource: null, recentPaceSegments: [], trackingDiagnostics: current.trackingDiagnostics ? { ...current.trackingDiagnostics, rollingPaceDistanceM: 0, rollingPaceDurationS: 0 } : current.trackingDiagnostics, updatedAt: pausedAt }, activeElapsedS));
       setGps('Recording paused.');
       setMotionMessage('Motion tracking paused.');
     } else {
@@ -839,6 +952,7 @@ export function ActivityRecorder() {
     setFinishing(true);
     stopWatch();
     stopMotionSensors();
+    releaseWakeLock();
     const endedAt = now();
     let finalLive = liveActivity;
     let liveEndStatus = current.liveSessionId ? current.liveEndStatus ?? 'UNCONFIRMED' as const : null;
@@ -853,19 +967,20 @@ export function ActivityRecorder() {
       }
     }
     setLive(false);
-    const finished: LocalActivity = {
+    const activeElapsedS = elapsedSeconds(current);
+    const finished: LocalActivity = refreshActivityMetrics({
       ...current,
       status: 'FINISHED',
       published: false,
       syncStatus: 'LOCAL',
       endedAt,
-      elapsedBeforePauseS: elapsedSeconds(current),
+      elapsedBeforePauseS: activeElapsedS,
       activeSince: null,
       liveRequested: false,
       liveEndStatus,
       timeline: completeTimeline(current, finalLive?.timeline, endedAt),
       updatedAt: endedAt,
-    };
+    }, activeElapsedS);
     persist(finished);
     setShortActivityWarning(false);
     setScreen('SUMMARY');
@@ -917,6 +1032,7 @@ export function ActivityRecorder() {
       movingTimeS: Math.round(current.movingTimeS ?? 0),
       distanceM: current.distanceM,
       steps: current.steps ?? 0,
+      stepSource: current.stepSource ?? 'UNAVAILABLE',
       averagePaceSPerKm: current.averagePaceSPerKm ?? null,
       caloriesKcal: current.caloriesKcal ?? 0,
       currentElevationM: current.currentElevationM ?? null,
@@ -967,6 +1083,7 @@ export function ActivityRecorder() {
     if (!window.confirm(current.syncStatus === 'SYNCED' ? 'Remove the local copy? The synchronized online activity will remain available.' : 'Discard this unsynced activity and its locally recorded route?')) return;
     stopWatch();
     stopMotionSensors();
+    releaseWakeLock();
     if (current.liveSessionId && (live || liveActivity?.active !== false)) {
       try {
         await api('/live/current', { method: 'DELETE' });
@@ -988,26 +1105,55 @@ export function ActivityRecorder() {
   }
 
   const seconds = activity ? elapsed : 0;
-  const speed = activity ? averageSpeedKmh(activity.distanceM, activity.movingTimeS ?? 0) : 0;
-  const motionEstimateActive = Boolean(activity && !activity.gpsAvailable && activity.distanceM > 0 && activity.distanceSource !== 'NONE');
-  const formattedPace = formatPaceSeconds(activity?.currentPaceSPerKm ?? activity?.averagePaceSPerKm);
-  const pace = motionEstimateActive && formattedPace !== '--' ? `~${formattedPace}` : formattedPace;
-  const averagePace = formatPaceSeconds(activity?.averagePaceSPerKm);
+  const speed = activity ? averageSpeedKmh(activity.distanceM, seconds) : 0;
+  const motionEstimateActive = Boolean(activity && (activity.motionFallbackDistanceM ?? 0) > 0);
+  const calculatedAveragePace = activity ? averagePaceSeconds(activity.type, activity.distanceM, seconds) : null;
+  const formattedAveragePace = formatPaceSeconds(calculatedAveragePace);
+  const pace = motionEstimateActive && formattedAveragePace !== '--' ? `~${formattedAveragePace}` : formattedAveragePace;
+  const averagePace = formatPaceSeconds(calculatedAveragePace);
+  const movingPace = formatPaceSeconds(activity ? averageMovingPaceSeconds(activity.type, activity.distanceM, activity.movingTimeS ?? 0) : null);
   const elevationGainM = Math.min(activity?.elevationGainM ?? 0, (activity?.distanceM ?? 0) * 0.45);
-  const elevation = activity?.currentElevationM === null || activity?.currentElevationM === undefined
-    ? '--'
-    : `${activity.currentElevationM < 0 ? `${Math.abs(Math.round(activity.currentElevationM))} m below sea level` : `${Math.round(activity.currentElevationM)} m`}${activity.distanceM >= 50 && elevationGainM >= 1 ? ` ↑${Math.round(elevationGainM)} m` : ''}`;
+  const altitudeAccuracyM = activity?.trackingDiagnostics?.lastAltitudeAccuracyM;
+  const elevationReliable = activity?.currentElevationM !== null && activity?.currentElevationM !== undefined && altitudeAccuracyM !== null && altitudeAccuracyM !== undefined && altitudeAccuracyM <= 20;
+  const elevation = elevationReliable ? `${Math.max(0, Math.round(elevationGainM))} m` : '--';
   const distance = `${motionEstimateActive ? '~' : ''}${formatDistance(activity?.distanceM ?? 0)}`;
-  const calories = `${motionEstimateActive ? '~' : ''}${Math.round(activity?.caloriesKcal ?? 0)} kcal`;
-  const stepsUnavailable = (motionStatus === 'UNAVAILABLE' || motionStatus === 'DENIED') && !(activity?.steps ?? 0);
-  const steps = stepsUnavailable ? '--' : (activity?.steps ?? 0).toLocaleString();
-  const trackingSource = activity?.status === 'PAUSED'
+  const calories = `~${Math.round(activity?.caloriesKcal ?? 0)} kcal`;
+  const nativeStepMode = activity?.stepSource === 'NATIVE';
+  const stepsUnavailable = !nativeStepMode && !(activity?.gpsDistanceM ?? 0) && !(activity?.browserMotionSteps ?? 0) && !(activity?.steps ?? 0);
+  const steps = stepsUnavailable ? '--' : `${nativeStepMode ? '' : '~'}${(activity?.steps ?? 0).toLocaleString()}`;
+  const sourceLine = activity?.status === 'PAUSED'
     ? 'Tracking paused'
-    : motionSource === 'NATIVE'
-      ? activity?.gpsAvailable ? 'GPS + native steps' : 'Native motion tracking'
-      : motionSource === 'BROWSER_ESTIMATED'
-        ? activity?.gpsAvailable ? 'GPS + browser motion estimate' : 'Browser motion estimate'
-        : activity?.gpsAvailable ? 'GPS only' : 'Step sensor unavailable';
+    : activity?.type === 'RIDE'
+      ? `${activity.gpsAvailable ? 'GPS distance' : 'GPS waiting'} • Average speed`
+      : `${motionEstimateActive ? 'Estimated distance' : activity?.gpsAvailable ? 'GPS distance' : 'Distance waiting'} • ${nativeStepMode ? 'Device steps' : 'Estimated steps'} • ${motionEstimateActive ? 'Estimated pace' : activity?.gpsAvailable ? 'GPS pace' : 'Pace waiting'}`;
+  const trackingSource = nativeStepMode ? 'Device steps' : activity?.stepSource === 'GPS_MOTION_ESTIMATED' ? 'Estimated from distance and phone motion' : activity?.stepSource === 'BROWSER_ESTIMATED' ? 'Estimated from phone motion' : 'Unavailable';
+  const activityDiagnostics = activity?.trackingDiagnostics;
+  const diagnosticRows: Array<[string, string | number]> = activity ? [
+    ['Runtime', hasNativeStepCounterBridge() ? 'Capacitor' : 'Browser'],
+    ['Native step plugin available', hasNativeStepCounterBridge() ? 'Yes' : 'No'],
+    ['Motion runtime source', motionSource],
+    ['Step source', activity.stepSource ?? 'UNAVAILABLE'],
+    ['Motion sample rate', `${motionSampleRateHz} Hz`],
+    ['Raw motion steps', activity.browserMotionSteps ?? 0],
+    ['GPS-estimated steps', activity.gpsEstimatedSteps ?? 0],
+    ['Displayed steps', activity.steps ?? 0],
+    ['Accepted GPS points', activityDiagnostics?.acceptedGpsPoints ?? 0],
+    ['Rejected inaccurate points', activityDiagnostics?.rejectedInaccuratePoints ?? 0],
+    ['Rejected stationary points', activityDiagnostics?.rejectedStationaryPoints ?? 0],
+    ['Rejected impossible points', activityDiagnostics?.rejectedImpossiblePoints ?? 0],
+    ['Current GPS accuracy', activity.gpsAccuracyM === null || activity.gpsAccuracyM === undefined ? '--' : `${Math.round(activity.gpsAccuracyM)} m`],
+    ['GPS distance', `${(activity.gpsDistanceM ?? 0).toFixed(1)} m`],
+    ['Fallback distance', `${(activity.motionFallbackDistanceM ?? 0).toFixed(1)} m`],
+    ['Displayed distance', `${activity.distanceM.toFixed(1)} m`],
+    ['Elapsed time', `${seconds} s`],
+    ['Moving time', `${(activity.movingTimeS ?? 0).toFixed(1)} s`],
+    ['Rolling pace distance', `${(activityDiagnostics?.rollingPaceDistanceM ?? 0).toFixed(1)} m`],
+    ['Rolling pace duration', `${(activityDiagnostics?.rollingPaceDurationS ?? 0).toFixed(1)} s`],
+    ['Current pace', formatPaceSeconds(activity.currentPaceSPerKm)],
+    ['Current speed', activity.currentSpeedKmh ? `${activity.currentSpeedKmh.toFixed(1)} km/h` : '--'],
+    ['Altitude accuracy', activityDiagnostics?.lastAltitudeAccuracyM === null || activityDiagnostics?.lastAltitudeAccuracyM === undefined ? '--' : `${Math.round(activityDiagnostics.lastAltitudeAccuracyM)} m`],
+    ['Wake lock', wakeLockActive ? 'Active' : 'Inactive'],
+  ] : [];
   const liveComments = liveActivity?.comments ?? [];
   const gpsProblem = /denied|unavailable|too long|blocked|weak/i.test(gps);
   const accessNoteState = secureContext === 'INSECURE' ? 'insecure' : storageState === 'ERROR' ? 'error' : locationAccess === 'DENIED' ? 'denied' : restoring || startPending ? 'checking' : 'ready';
@@ -1060,7 +1206,7 @@ export function ActivityRecorder() {
   if (screen === 'SUMMARY') return <section className="record-shell stack" data-recorder-hydrated={clientHydrated}>
     <div className="hero activity-review-heading"><span className="review-complete-icon"><UiIcon name="highfive" /></span><div><p>Activity complete</p><h1>Review your {labelFor(activity.type).toLowerCase()}</h1><small className="summary-date">{new Date(activity.startedAt).toLocaleString()}</small></div></div>
     {activity.route.length ? <RouteMap points={activity.route} /> : <div className="route-empty-state"><UiIcon name="map" size={30} /><strong>No GPS route recorded</strong><span>{activity.steps ? `${activity.steps.toLocaleString()} steps and ${formatDistance(activity.distanceM)} of motion-estimated distance were still saved.` : 'Your time is still saved. Enable location and motion access before your next activity for richer metrics.'}</span></div>}
-    <Metrics activity={activity} seconds={seconds} speed={speed} pace={averagePace} />
+    <Metrics activity={activity} seconds={seconds} speed={speed} pace={averagePace} movingPace={movingPace} />
     {activity.liveSessionId && <section className={`card live-recap-card ${activity.liveEndStatus === 'UNCONFIRMED' ? 'warning' : ''}`}><UiIcon name={activity.liveEndStatus === 'UNCONFIRMED' ? 'shield' : 'radio'} /><div><strong>{activity.liveEndStatus === 'UNCONFIRMED' ? 'Live stop is not confirmed' : 'Live session ended'}</strong><span>{activity.liveEndStatus === 'UNCONFIRMED' ? 'Your recording is safe, but reconnect before discarding so Flinkout can confirm the broadcast ended.' : `${liveActivity?.joinCount ?? 0} joined - ${liveActivity?.highFiveCount ?? 0} high-fives - ${liveActivity?.commentCount ?? 0} live updates saved to the timeline.`}</span></div></section>}
     <section className="card stack activity-publish-card">
       <div><p className="eyebrow">FINAL STEP</p><h2>Choose who can see it</h2><p>{activity.route.length ? 'Review your route, metrics, and live timeline before publishing.' : activity.steps ? 'No GPS route was captured. Your step count and estimated distance can still be included.' : 'No GPS route or motion steps were captured. Your activity type and time are still saved.'}</p></div>
@@ -1076,12 +1222,15 @@ export function ActivityRecorder() {
       <span className={`live-session-chip ${live ? 'sharing' : ''}`}><i /> {live ? 'Live now' : activity.status === 'PAUSED' ? 'Recording paused' : activity.liveRequested ? 'Waiting to go live' : 'Recording only'} - {labelFor(activity.type)}</span>
     </div>
     <section className="live-metrics-panel">
-      <div className="live-primary-metrics"><span><small>Distance</small><strong>{distance}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Speed' : 'Pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
-      <div className="live-secondary-metrics"><span><small>Steps</small><strong>{activity.type === 'RIDE' ? '-' : steps}</strong></span><span><small>Elevation</small><strong>{elevation}</strong></span><span><small>Calories</small><strong>{calories}</strong></span></div>
-      <p className={`status ${gpsProblem ? 'warning' : ''}`} role="status">{gps}{gpsProblem ? motionStatus === 'ACTIVE' && activity.type !== 'RIDE' ? ' Motion sensors are continuing steps and estimated distance.' : ' Timing continues, but distance may be unavailable.' : ''}</p>
+      <div className="live-primary-metrics"><span><small>Distance</small><strong>{distance}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Average speed' : 'Average pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
+      <div className="live-secondary-metrics"><span><small>{activity.type === 'RIDE' ? 'GPS samples' : nativeStepMode ? 'Device steps' : 'Estimated steps'}</small><strong>{activity.type === 'RIDE' ? activity.route.length : steps}</strong></span><span><small>Elevation gain</small><strong>{elevation}</strong></span><span><small>Estimated calories</small><strong>{calories}</strong></span></div>
+      <p className="tracking-source-line">{sourceLine}</p>
+      <p className={`status ${gpsProblem ? 'warning' : ''}`} role="status">{gps}</p>
+      {continuityWarning && <p className="status warning" role="status">{continuityWarning}</p>}
       {(locationAccess === 'DENIED' || locationAccess === 'UNAVAILABLE') && <button className="enable-location-button" onClick={() => void requestLocationAccess().then(allowed => { if (allowed) { stopWatch(); beginWatch(); } })}>Try location again</button>}
-      <p className={`status motion-status ${motionStatus === 'DENIED' || motionStatus === 'UNAVAILABLE' ? 'warning' : ''}`} role="status">{trackingSource}. {motionMessage}</p>
+      {(motionStatus === 'DENIED' || motionStatus === 'UNAVAILABLE') && <p className="status motion-status warning" role="status">{activity.gpsAvailable ? 'Phone motion unavailable — GPS route and distance are still recording.' : 'Phone motion and GPS are unavailable — only duration is currently reliable.'}</p>}
       {(motionStatus === 'NEEDS_PERMISSION' || motionStatus === 'DENIED') && activity.type !== 'RIDE' && <button className="enable-motion-button" onClick={() => void beginMotionSensors(activity.type, true)}>Enable motion sensors</button>}
+      {process.env.NODE_ENV === 'development' && <details className="tracking-diagnostics"><summary>Tracking diagnostics</summary><p>{trackingSource}. {motionMessage}</p><dl>{diagnosticRows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>}
       {liveMessage && <p className={`hint live-sharing-message ${livePending ? 'pending' : ''}`} role="status">{liveMessage}</p>}
       {liveAttempted && !live && activity.liveRequested && !activity.liveSessionId && <button className="retry-live-button" onClick={() => { setLiveAttempted(false); setLiveMessage('Retrying live sharing...'); }} disabled={!online || livePending}>Retry live sharing</button>}
       {liveActivity && <section className="recording-community-panel">
@@ -1096,8 +1245,9 @@ export function ActivityRecorder() {
   </section>;
 }
 
-function Metrics({ activity, seconds, speed, pace }: { activity: LocalActivity; seconds: number; speed: number; pace: string }) {
+function Metrics({ activity, seconds, speed, pace, movingPace }: { activity: LocalActivity; seconds: number; speed: number; pace: string; movingPace: string }) {
   const paceActivity = activity.type === 'WALK' || activity.type === 'RUN' || activity.type === 'HIKE';
-  const stepMetric = activity.stepSource === 'UNAVAILABLE' && !(activity.steps ?? 0) ? '--' : (activity.steps ?? 0).toLocaleString();
-  return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance - {distanceSourceLabel(activity)}</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? 'Average pace' : 'Average speed'}</span></div><div className="metric"><strong>{paceActivity ? stepMetric : activity.route.length}</strong><span>{paceActivity ? 'Steps' : 'GPS samples'}</span></div></section>;
+  const estimated = activity.stepSource !== 'NATIVE';
+  const stepMetric = activity.stepSource === 'UNAVAILABLE' && !(activity.steps ?? 0) ? '--' : `${estimated ? '~' : ''}${(activity.steps ?? 0).toLocaleString()}`;
+  return <section className="metrics"><div className="metric"><strong>{formatDuration(seconds)}</strong><span>Duration</span></div><div className="metric"><strong>{formatDistance(activity.distanceM)}</strong><span>Distance - {distanceSourceLabel(activity)}</span></div><div className="metric"><strong>{paceActivity ? pace : speed ? `${speed.toFixed(1)} km/h` : '-'}</strong><span>{paceActivity ? `Average pace • moving ${movingPace}` : 'Average speed'}</span></div><div className="metric"><strong>{paceActivity ? stepMetric : activity.route.length}</strong><span>{paceActivity ? activity.stepSource === 'NATIVE' ? 'Device steps' : 'Estimated steps' : 'GPS samples'}</span></div></section>;
 }

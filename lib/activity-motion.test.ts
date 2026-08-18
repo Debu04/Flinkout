@@ -1,26 +1,52 @@
 import { describe, expect, it } from 'vitest';
 import {
-  calibratedStrideM,
+  GPS_ACCURACY_LIMITS_M,
+  averagePaceSeconds,
   detectStep,
   estimatedCalories,
   initialStepDetectorState,
   markGpsUnavailable,
   recordGpsSample,
-  recordGpsSegment,
   recordMotionSteps,
 } from './activity-motion';
-import type { LocalActivity, RoutePoint } from './activity';
+import type { ActivityType, LocalActivity, RoutePoint } from './activity';
+
+const METERS_PER_LONGITUDE_DEGREE = 111_194.9;
 
 const activity = (overrides: Partial<LocalActivity> = {}): LocalActivity => ({
-  clientId: '00000000-0000-4000-8000-000000000000', type: 'WALK', visibility: 'PRIVATE', status: 'RECORDING', published: false,
-  syncStatus: 'LOCAL', syncError: null, syncedActivityId: null, lastSyncAttemptAt: null, startedAt: '2026-08-08T10:00:00.000Z',
-  endedAt: null, elapsedBeforePauseS: 0, activeSince: '2026-08-08T10:00:00.000Z', movingTimeS: 0, distanceM: 0, route: [],
-  createdAt: '2026-08-08T10:00:00.000Z', updatedAt: '2026-08-08T10:00:00.000Z', ...overrides,
+  clientId: '00000000-0000-4000-8000-000000000000',
+  type: 'WALK',
+  visibility: 'PRIVATE',
+  status: 'RECORDING',
+  published: false,
+  syncStatus: 'LOCAL',
+  syncError: null,
+  syncedActivityId: null,
+  lastSyncAttemptAt: null,
+  startedAt: '2026-08-08T10:00:00.000Z',
+  endedAt: null,
+  elapsedBeforePauseS: 0,
+  activeSince: '2026-08-08T10:00:00.000Z',
+  movingTimeS: 0,
+  lastMovementAt: null,
+  distanceM: 0,
+  gpsDistanceM: 0,
+  motionFallbackDistanceM: 0,
+  nativeSteps: 0,
+  browserMotionSteps: 0,
+  gpsEstimatedSteps: 0,
+  motionFallbackSteps: 0,
+  steps: 0,
+  stepSource: 'UNAVAILABLE',
+  route: [],
+  createdAt: '2026-08-08T10:00:00.000Z',
+  updatedAt: '2026-08-08T10:00:00.000Z',
+  ...overrides,
 });
 
-const point = (longitude: number, recordedAt: string, overrides: Partial<RoutePoint> = {}): RoutePoint => ({
+const pointAt = (meters: number, recordedAt: string, overrides: Partial<RoutePoint> = {}): RoutePoint => ({
   latitude: 0,
-  longitude,
+  longitude: meters / METERS_PER_LONGITUDE_DEGREE,
   accuracy: 5,
   altitude: null,
   altitudeAccuracy: null,
@@ -29,7 +55,7 @@ const point = (longitude: number, recordedAt: string, overrides: Partial<RoutePo
   ...overrides,
 });
 
-function countPattern(candidateTimes: number[], rotationRate = 0, amplitude = 2.6) {
+function countPattern(candidateTimes: number[], rotationRate = 0, amplitude = 2.6, type: ActivityType = 'WALK') {
   let state = initialStepDetectorState();
   let steps = 0;
   const samples = [{ timestamp: 0, x: 0 }, ...candidateTimes.flatMap(timestamp => [
@@ -39,141 +65,180 @@ function countPattern(candidateTimes: number[], rotationRate = 0, amplitude = 2.
     { timestamp: timestamp + 300, x: 0 },
   ])].sort((a, b) => a.timestamp - b.timestamp);
   for (const sample of samples) {
-    const result = detectStep(state, { x: sample.x, y: 0, z: 0, includesGravity: false, timestamp: sample.timestamp, rotationRate });
+    const result = detectStep(state, { x: sample.x, y: 0, z: 0, includesGravity: false, timestamp: sample.timestamp, rotationRate }, type);
     state = result.state;
     steps += result.steps;
   }
   return { steps, state };
 }
 
-describe('motion step detection', () => {
+describe('browser motion detection', () => {
   it('requires a repeated cadence-consistent walking pattern', () => {
     const result = countPattern([100, 700, 1_300, 1_900, 2_500]);
     expect(result.steps).toBe(5);
     expect(result.state.cadenceSpm).toBeCloseTo(100, 0);
   });
 
-  it('accepts a lower-amplitude walking pattern while the phone rotates naturally', () => {
-    const result = countPattern([100, 730, 1_310, 1_990, 2_600], 350, 1.5);
-    expect(result.steps).toBe(5);
-    expect(result.state.cadenceSpm).toBeGreaterThan(85);
+  it('supports lower-amplitude motion and different phone orientation', () => {
+    const hand = countPattern([100, 730, 1_310, 1_990, 2_600], 320, 1.5);
+    const pocket = countPattern([100, 730, 1_310, 1_990, 2_600], 280, -1.5);
+    expect(hand.steps).toBe(5);
+    expect(pocket.steps).toBe(5);
   });
 
-  it('does not count an isolated spike or rapid phone shaking', () => {
+  it('rejects isolated bumps, rapid shaking, and rotation without cadence', () => {
     expect(countPattern([100]).steps).toBe(0);
     expect(countPattern([100, 250, 400, 550, 700]).steps).toBe(0);
     expect(countPattern([100, 700, 1_300, 1_900], 900, 8).steps).toBe(0);
   });
 
-  it('does not count a stationary gravity signal', () => {
-    let state = initialStepDetectorState();
-    let steps = 0;
-    for (let timestamp = 0; timestamp < 2_000; timestamp += 50) {
-      const result = detectStep(state, { x: 0, y: 0, z: 9.81, includesGravity: true, timestamp });
-      state = result.state;
-      steps += result.steps;
-    }
-    expect(steps).toBe(0);
+  it('uses the running cadence range for runs', () => {
+    expect(countPattern([100, 500, 900, 1_300, 1_700], 0, 2.6, 'RUN').steps).toBe(5);
+    expect(countPattern([100, 800, 1_500, 2_200], 0, 2.6, 'RUN').steps).toBe(0);
   });
 });
 
-describe('GPS and motion fusion', () => {
-  it('uses motion for steps but not distance while GPS is reliable', () => {
-    const withGps = recordGpsSegment(activity(), 100, '2026-08-08T10:01:00.000Z');
-    const withSteps = recordMotionSteps(withGps, 3, 100, '2026-08-08T10:01:02.000Z', 'NATIVE');
-    expect(withSteps.steps).toBe(3);
-    expect(withSteps.stepSource).toBe('NATIVE');
-    expect(withSteps.distanceM).toBeCloseTo(100, 4);
-    expect(withSteps.distanceSource).toBe('FUSED');
+describe('authoritative GPS and fused metric pipeline', () => {
+  it('calculates 620 m over 1,429 s as approximately 38:25 /km', () => {
+    const pace = averagePaceSeconds('WALK', 620, 1_429);
+    expect(pace).toBeCloseTo(2_304.84, 1);
+    expect(Math.round(pace!)).toBe(2_305);
   });
 
-  it('continues estimated distance and pace when GPS is unavailable', () => {
-    const lost = markGpsUnavailable(recordGpsSegment(activity(), 100, '2026-08-08T10:01:00.000Z'), '2026-08-08T10:01:01.000Z');
-    const withSteps = recordMotionSteps(lost, 3, 100, '2026-08-08T10:01:03.000Z');
-    expect(withSteps.distanceM).toBeCloseTo(101.8, 2);
-    expect(withSteps.currentPaceSPerKm).toBeCloseTo(1_000, 1);
-    expect(withSteps.paceSource).toBe('MOTION_ESTIMATED');
-    expect(withSteps.caloriesKcal).toBeGreaterThan(0);
+  it('uses a rolling collection of recent segments for current pace', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const tenMeters = recordGpsSample(first, pointAt(10, '2026-08-08T10:00:10.000Z')).activity;
+    expect(tenMeters.currentPaceSPerKm).toBeNull();
+    const twentyMeters = recordGpsSample(tenMeters, pointAt(20, '2026-08-08T10:00:20.000Z')).activity;
+    expect(twentyMeters.currentPaceSPerKm).toBeCloseTo(1_000, -1);
+    const fastLastSegment = recordGpsSample(twentyMeters, pointAt(50, '2026-08-08T10:00:30.000Z')).activity;
+    expect(fastLastSegment.currentPaceSPerKm).toBeGreaterThan(700);
+    expect(fastLastSegment.trackingDiagnostics?.rollingPaceDistanceM).toBeCloseTo(50, 0);
+    expect(fastLastSegment.trackingDiagnostics?.rollingPaceDurationS).toBe(30);
   });
 
-  it('does not invent a step count from GPS distance', () => {
-    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z')).activity;
-    const moved = recordGpsSample(first, point(0.0009, '2026-08-08T10:03:00.000Z')).activity;
-    const movedAgain = recordGpsSample(moved, point(0.0018, '2026-08-08T10:06:00.000Z')).activity;
-    expect(movedAgain.distanceM).toBeGreaterThan(199);
-    expect(movedAgain.steps ?? 0).toBe(0);
-    expect(movedAgain.strideM).toBeCloseTo(0.6, 2);
-    expect(movedAgain.averagePaceSPerKm).toBeCloseTo(1_798.6, 0);
-    expect(movedAgain.distanceSource).toBe('GPS');
+  it('makes current pace unavailable after ten stationary seconds', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const moved = recordGpsSample(first, pointAt(25, '2026-08-08T10:00:15.000Z')).activity;
+    expect(moved.currentPaceSPerKm).not.toBeNull();
+    const stationary = recordGpsSample(moved, pointAt(25.5, '2026-08-08T10:00:26.000Z')).activity;
+    expect(stationary.currentPaceSPerKm).toBeNull();
+    expect(stationary.route).toHaveLength(moved.route.length);
   });
 
-  it('keeps the cumulative average pace through a stationary GPS heartbeat', () => {
-    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z')).activity;
-    const moved = recordGpsSample(first, point(0.0009, '2026-08-08T10:01:20.000Z')).activity;
-    const stationary = recordGpsSample(moved, point(0.000901, '2026-08-08T10:01:40.000Z')).activity;
-    expect(stationary.averagePaceSPerKm).toBeCloseTo(moved.averagePaceSPerKm!, 6);
-    expect(stationary.currentPaceSPerKm).toBe(moved.currentPaceSPerKm);
+  it('rejects stationary drift without changing route, distance, moving time, or calories', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const drift = recordGpsSample(first, pointAt(1.5, '2026-08-08T10:00:15.000Z'));
+    expect(drift.reason).toBe('STATIONARY');
+    expect(drift.accepted).toBe(false);
+    expect(drift.activity.route).toHaveLength(1);
+    expect(drift.activity.distanceM).toBe(0);
+    expect(drift.activity.movingTimeS).toBe(0);
+    expect(drift.activity.caloriesKcal ?? 0).toBe(0);
   });
 
-  it('establishes a new GPS baseline after motion fallback without a distance jump', () => {
-    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z')).activity;
-    const moved = recordGpsSample(first, point(0.0009, '2026-08-08T10:01:20.000Z')).activity;
-    const motionOnly = recordMotionSteps(markGpsUnavailable(moved, '2026-08-08T10:01:21.000Z'), 100, 100, '2026-08-08T10:02:21.000Z');
-    const recovered = recordGpsSample(motionOnly, point(0.00155, '2026-08-08T10:02:22.000Z')).activity;
-    expect(recovered.distanceM).toBeCloseTo(motionOnly.distanceM, 5);
-    expect(recovered.gpsDistanceM).toBeCloseTo(motionOnly.distanceM, 5);
-    expect(recovered.gpsAvailable).toBe(true);
-    expect(recovered.route.at(-1)?.startsNewSegment).toBe(true);
+  it('does not let weak GPS alter distance, pace, route, moving time, or elevation', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const weak = recordGpsSample(first, pointAt(30, '2026-08-08T10:00:15.000Z', { accuracy: GPS_ACCURACY_LIMITS_M.WALK + 1, altitude: 500, altitudeAccuracy: 5 }));
+    expect(weak.reason).toBe('INACCURATE');
+    expect(weak.activity.route).toEqual(first.route);
+    expect(weak.activity.distanceM).toBe(first.distanceM);
+    expect(weak.activity.movingTimeS).toBe(first.movingTimeS);
+    expect(weak.activity.currentPaceSPerKm).toBe(first.currentPaceSPerKm);
+    expect(weak.activity.currentElevationM).toBe(first.currentElevationM);
   });
 
-  it('rejects poor accuracy, stationary jitter, and impossible jumps', () => {
-    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z')).activity;
-    const inaccurate = recordGpsSample(first, point(0.001, '2026-08-08T10:00:10.000Z', { accuracy: 90 }));
-    expect(inaccurate.reason).toBe('INACCURATE');
-    expect(inaccurate.activity.distanceM).toBe(0);
-    const jitter = recordGpsSample(first, point(0.00001, '2026-08-08T10:00:10.000Z'));
-    expect(jitter.reason).toBe('STATIONARY');
-    expect(jitter.activity.distanceM).toBe(0);
-    const jump = recordGpsSample(first, point(0.01, '2026-08-08T10:00:01.000Z'));
+  it('rejects impossible jumps', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const jump = recordGpsSample(first, pointAt(1_000, '2026-08-08T10:00:01.000Z'));
     expect(jump.reason).toBe('IMPLAUSIBLE');
     expect(jump.activity.route).toHaveLength(1);
+    expect(jump.activity.distanceM).toBe(0);
   });
 
-  it('keeps the GPS route and distance moving when Android reports speed as zero', () => {
-    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z', { speed: 0 })).activity;
-    const secondResult = recordGpsSample(first, point(0.00009, '2026-08-08T10:00:10.000Z', { speed: 0 }));
-    const thirdResult = recordGpsSample(secondResult.activity, point(0.00018, '2026-08-08T10:00:20.000Z', { speed: 0 }));
-    expect(secondResult.reason).toBe('ACCEPTED');
-    expect(thirdResult.reason).toBe('ACCEPTED');
-    expect(thirdResult.activity.route).toHaveLength(3);
-    expect(thirdResult.activity.distanceM).toBeGreaterThan(19);
+  it('keeps valid Android browser GPS movement when reported speed is zero', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z', { speed: 0 })).activity;
+    const second = recordGpsSample(first, pointAt(10, '2026-08-08T10:00:10.000Z', { speed: 0 }));
+    const third = recordGpsSample(second.activity, pointAt(20, '2026-08-08T10:00:20.000Z', { speed: 0 }));
+    expect(second.reason).toBe('ACCEPTED');
+    expect(third.reason).toBe('ACCEPTED');
+    expect(third.activity.route).toHaveLength(3);
+    expect(third.activity.distanceM).toBeCloseTo(20, 0);
   });
 
-  it('stops active metrics while paused', () => {
-    const paused = activity({ status: 'PAUSED', trackingMode: 'PAUSED', steps: 20, distanceM: 50, movingTimeS: 30, caloriesKcal: 2 });
-    expect(recordMotionSteps(paused, 3, 100, '2026-08-08T10:01:00.000Z')).toEqual(paused);
+  it('continues fallback distance during GPS loss and starts a clean recovery segment', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const moved = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
+    const lost = markGpsUnavailable(moved, '2026-08-08T10:01:01.000Z');
+    const fallback = recordMotionSteps(lost, 20, 100, '2026-08-08T10:01:13.000Z');
+    expect(fallback.motionFallbackDistanceM).toBeCloseTo(13, 5);
+    expect(fallback.distanceM).toBeCloseTo(78, 0);
+    const recovered = recordGpsSample(fallback, pointAt(300, '2026-08-08T10:01:14.000Z')).activity;
+    expect(recovered.distanceM).toBeCloseTo(fallback.distanceM, 5);
+    expect(recovered.route.at(-1)?.startsNewSegment).toBe(true);
+    const afterRecovery = recordGpsSample(recovered, pointAt(310, '2026-08-08T10:01:24.000Z')).activity;
+    expect(afterRecovery.distanceM).toBeCloseTo(88, 0);
+    expect(afterRecovery.gpsDistanceM).toBeCloseTo(75, 0);
   });
 
-  it('ignores stationary altitude noise and counts only a sustained plausible climb', () => {
-    const first = recordGpsSample(activity(), point(0, '2026-08-08T10:00:00.000Z', { altitude: 100, altitudeAccuracy: 8 })).activity;
-    const noisy = recordGpsSample(first, point(0.00001, '2026-08-08T10:00:10.000Z', { altitude: 130, altitudeAccuracy: 8 })).activity;
-    expect(noisy.currentElevationM).toBe(100);
-    expect(noisy.elevationGainM ?? 0).toBe(0);
-    const climb1 = recordGpsSample(noisy, point(0.00018, '2026-08-08T10:00:20.000Z', { altitude: 105, altitudeAccuracy: 8 })).activity;
-    const climb2 = recordGpsSample(climb1, point(0.00036, '2026-08-08T10:00:30.000Z', { altitude: 110, altitudeAccuracy: 8 })).activity;
-    const climbed = recordGpsSample(climb2, point(0.00054, '2026-08-08T10:00:40.000Z', { altitude: 115, altitudeAccuracy: 8 })).activity;
-    expect(climbed.elevationGainM).toBeGreaterThan(4);
+  it('does not double-count GPS-estimated and browser-motion steps', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const gps = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
+    expect(gps.gpsEstimatedSteps).toBe(100);
+    expect(gps.steps).toBe(100);
+    const motionWhileGps = recordMotionSteps(gps, 20, 100, '2026-08-08T10:01:12.000Z');
+    expect(motionWhileGps.browserMotionSteps).toBe(20);
+    expect(motionWhileGps.steps).toBe(100);
+    expect(motionWhileGps.distanceM).toBeCloseTo(65, 0);
+    const fallback = recordMotionSteps(markGpsUnavailable(motionWhileGps, '2026-08-08T10:01:13.000Z'), 10, 100, '2026-08-08T10:01:19.000Z');
+    expect(fallback.steps).toBe(110);
+    expect(fallback.motionFallbackSteps).toBe(10);
+  });
+
+  it('keeps native steps authoritative when GPS distance changes', () => {
+    const nativeActivity = activity({ stepSource: 'NATIVE' });
+    const first = recordGpsSample(nativeActivity, pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const gps = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
+    expect(gps.gpsEstimatedSteps).toBe(100);
+    expect(gps.steps).toBe(0);
+    const native = recordMotionSteps(gps, 42, 100, '2026-08-08T10:01:25.000Z', 'NATIVE');
+    expect(native.nativeSteps).toBe(42);
+    expect(native.steps).toBe(42);
+    expect(native.stepSource).toBe('NATIVE');
+    const moreGps = recordGpsSample(native, pointAt(130, '2026-08-08T10:02:00.000Z')).activity;
+    expect(moreGps.gpsEstimatedSteps).toBe(200);
+    expect(moreGps.steps).toBe(42);
+  });
+
+  it('does not increase active calories during stationary time', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const moved = recordGpsSample(first, pointAt(50, '2026-08-08T10:01:00.000Z')).activity;
+    expect(moved.caloriesKcal).toBeGreaterThan(0);
+    const stationary = recordGpsSample(moved, pointAt(50.5, '2026-08-08T10:01:20.000Z')).activity;
+    expect(stationary.caloriesKcal).toBe(moved.caloriesKcal);
+    expect(estimatedCalories('WALK', 0, 50)).toBe(0);
+  });
+
+  it('ignores altitude when vertical accuracy is poor', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z', { altitude: 100, altitudeAccuracy: 5 })).activity;
+    const poorAltitude = recordGpsSample(first, pointAt(20, '2026-08-08T10:00:15.000Z', { altitude: 150, altitudeAccuracy: 21 })).activity;
+    expect(poorAltitude.currentElevationM).toBe(first.currentElevationM);
+    expect(poorAltitude.elevationGainM ?? 0).toBe(0);
+  });
+
+  it('counts only a sustained, accurately measured elevation gain', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const altitude1 = recordGpsSample(first, pointAt(20, '2026-08-08T10:00:15.000Z', { altitude: 100, altitudeAccuracy: 5 })).activity;
+    const altitude2 = recordGpsSample(altitude1, pointAt(40, '2026-08-08T10:00:30.000Z', { altitude: 106, altitudeAccuracy: 5 })).activity;
+    const altitude3 = recordGpsSample(altitude2, pointAt(60, '2026-08-08T10:00:45.000Z', { altitude: 112, altitudeAccuracy: 5 })).activity;
+    const climbed = recordGpsSample(altitude3, pointAt(80, '2026-08-08T10:01:00.000Z', { altitude: 118, altitudeAccuracy: 5 })).activity;
+    expect(climbed.elevationGainM).toBeGreaterThan(3);
     expect(climbed.elevationLossM ?? 0).toBe(0);
-    const unreliable = recordGpsSample(climbed, point(0.0007, '2026-08-08T10:00:50.000Z', { altitude: 300, altitudeAccuracy: 80 })).activity;
-    expect(unreliable.currentElevationM).toBeCloseTo(climbed.currentElevationM!, 6);
   });
 
-  it('keeps the phone-reference calorie estimate near 216 kcal for 5,401 walking steps', () => {
-    expect(estimatedCalories('WALK', 3_660, 3_000, 70, 5_401)).toBeCloseTo(216, 0);
-  });
-
-  it('calibrates only inside plausible stride bounds', () => {
-    expect(calibratedStrideM('WALK', 100, 20, 0.6)).toBeCloseTo(0.67, 6);
-    expect(calibratedStrideM('RIDE', 100, 20, 0)).toBe(0);
+  it('does not change any active metrics while paused', () => {
+    const paused = activity({ status: 'PAUSED', trackingMode: 'PAUSED', steps: 20, distanceM: 50, gpsDistanceM: 50, movingTimeS: 30, caloriesKcal: 2 });
+    expect(recordMotionSteps(paused, 3, 100, '2026-08-08T10:01:00.000Z')).toEqual(paused);
+    expect(recordGpsSample(paused, pointAt(60, '2026-08-08T10:01:00.000Z')).activity).toEqual(paused);
   });
 });

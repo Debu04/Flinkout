@@ -69,7 +69,8 @@ function decodeCursor(cursor?: string) {
 function previewRoute(route: Prisma.JsonValue | null) {
   if (!Array.isArray(route) || route.length <= 100) return route;
   const step = Math.ceil(route.length / 100);
-  return route.filter((_, index) => index === 0 || index === route.length - 1 || index % step === 0);
+  return route.filter((point, index) => index === 0 || index === route.length - 1 || index % step === 0
+    || (typeof point === 'object' && point !== null && !Array.isArray(point) && point.startsNewSegment === true));
 }
 
 async function timelineFor(activity: ActivityWithSocial, viewerId: string, following: boolean) {
@@ -144,6 +145,7 @@ async function activityView(activity: ActivityWithSocial, viewerId: string, prev
     movingTimeS: activity.movingTimeS,
     distanceM: activity.distanceM,
     steps: activity.steps,
+    stepSource: activity.stepSource,
     averagePaceSPerKm: activity.averagePaceSPerKm,
     caloriesKcal: activity.caloriesKcal,
     currentElevationM: activity.currentElevationM,
@@ -199,6 +201,7 @@ export async function syncActivity(request: NextRequest, auth: AuthContext) {
       movingTimeS: activity.movingTimeS,
       distanceM: Math.round(activity.distanceM),
       steps: activity.steps,
+      stepSource: activity.stepSource,
       averagePaceSPerKm: activity.averagePaceSPerKm,
       caloriesKcal: activity.caloriesKcal,
       currentElevationM: activity.currentElevationM,

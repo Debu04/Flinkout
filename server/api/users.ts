@@ -32,7 +32,8 @@ function sampledRoute(route: Prisma.JsonValue | null) {
   const points = Array.isArray(route) ? route : undefined;
   if (!points || points.length <= 100) return route;
   const step = Math.ceil(points.length / 100);
-  return points.filter((_, index) => index === 0 || index === points.length - 1 || index % step === 0);
+  return points.filter((point, index) => index === 0 || index === points.length - 1 || index % step === 0
+    || (typeof point === 'object' && point !== null && !Array.isArray(point) && point.startsNewSegment === true));
 }
 
 async function relation(viewerId: string, ownerId: string) {
@@ -120,6 +121,7 @@ export async function getUserActivities(request: NextRequest, usernameValue: str
       movingTimeS: activity.movingTimeS,
       distanceM: activity.distanceM,
       steps: activity.steps,
+      stepSource: activity.stepSource,
       averagePaceSPerKm: activity.averagePaceSPerKm,
       caloriesKcal: activity.caloriesKcal,
       currentElevationM: activity.currentElevationM,

@@ -145,6 +145,7 @@ model Activity {
   movingTimeS       Int                @default(0) @map("moving_time_s")
   distanceM         Int                @default(0) @map("distance_m")
   steps             Int                @default(0)
+  stepSource        String             @default("UNAVAILABLE") @map("step_source") @db.VarChar(32)
   averagePaceSPerKm Float?             @map("average_pace_s_per_km")
   caloriesKcal      Float              @default(0) @map("calories_kcal")
   currentElevationM Float?             @map("current_elevation_m")
