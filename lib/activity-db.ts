@@ -1,4 +1,5 @@
 import type { LocalActivity } from './activity';
+import { defaultStrideM } from './activity-motion';
 
 const DB_NAME = 'flinkout';
 const STORE = 'activities';
@@ -7,7 +8,7 @@ const OPEN_TIMEOUT_MS = 4_000;
 function normalise(activity: LocalActivity): LocalActivity {
   const gpsDistanceM = activity.gpsDistanceM ?? activity.distanceM;
   const motionFallbackDistanceM = activity.motionFallbackDistanceM ?? 0;
-  const strideM = activity.strideM ?? ({ WALK: 0.65, RUN: 1, HIKE: 0.62, RIDE: 0 })[activity.type];
+  const strideM = activity.strideM ?? defaultStrideM(activity.type);
   const stepSource = activity.stepSource ?? 'UNAVAILABLE';
   return {
     ...activity,
@@ -42,6 +43,10 @@ function normalise(activity: LocalActivity): LocalActivity {
     elevationGainM: activity.elevationGainM ?? 0,
     elevationLossM: activity.elevationLossM ?? 0,
     altitudeSamplesM: activity.altitudeSamplesM ?? [],
+    lastElevationAt: activity.lastElevationAt ?? (activity.currentElevationM !== null && activity.currentElevationM !== undefined ? activity.lastReliableGpsAt ?? null : null),
+    lastMetricUpdateAt: activity.lastMetricUpdateAt ?? null,
+    pendingGpsDurationS: activity.pendingGpsDurationS ?? 0,
+    pendingGpsDisplacementM: activity.pendingGpsDisplacementM ?? 0,
     trackingMode: activity.status === 'PAUSED' ? 'PAUSED' : activity.trackingMode ?? 'GPS_MOTION',
     gpsAvailable: activity.gpsAvailable === undefined ? (activity.route.length ? true : undefined) : activity.gpsAvailable,
     gpsAccuracyM: activity.gpsAccuracyM ?? activity.route.at(-1)?.accuracy ?? null,

@@ -74,6 +74,10 @@ export type LocalActivity = {
   elevationGainM?: number;
   elevationLossM?: number;
   altitudeSamplesM?: number[];
+  lastElevationAt?: string | null;
+  lastMetricUpdateAt?: string | null;
+  pendingGpsDurationS?: number;
+  pendingGpsDisplacementM?: number;
   trackingMode?: TrackingMode;
   gpsAvailable?: boolean;
   gpsAccuracyM?: number | null;
@@ -119,5 +123,10 @@ export function formatPaceSeconds(secondsPerKm: number | null | undefined) {
 }
 export function formatPace(distanceM: number, seconds: number) {
   return formatPaceSeconds(distanceM > 0 && seconds > 0 ? seconds / (distanceM / 1000) : null);
+}
+export function formatSignedElevation(meters: number | null | undefined) {
+  if (meters === null || meters === undefined || !Number.isFinite(meters)) return '--';
+  const rounded = Math.round(meters);
+  return `${rounded > 0 ? '+' : ''}${rounded} m`;
 }
 export function labelFor(type: ActivityType) { return ({ WALK: 'Walk', RUN: 'Run', RIDE: 'Ride', HIKE: 'Hike' })[type]; }

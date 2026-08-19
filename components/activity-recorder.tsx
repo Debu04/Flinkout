@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ACTIVITY_TYPES, averageSpeedKmh, elapsedSeconds, formatDistance, formatDuration, formatPaceSeconds, labelFor, type ActivityType, type LocalActivity, type RoutePoint } from '../lib/activity';
-import { averageMovingPaceSeconds, averagePaceSeconds, detectStep, distanceSourceLabel, initialStepDetectorState, markGpsUnavailable, recordGpsSample, recordMotionSteps, refreshActivityMetrics } from '../lib/activity-motion';
+import { ACTIVITY_TYPES, averageSpeedKmh, elapsedSeconds, formatDistance, formatDuration, formatPaceSeconds, formatSignedElevation, labelFor, type ActivityType, type LocalActivity, type RoutePoint } from '../lib/activity';
+import { defaultStrideM, detectStep, distanceSourceLabel, initialStepDetectorState, markGpsUnavailable, recordGpsSample, recordMotionSteps, refreshActivityMetrics, resumeActivityTracking } from '../lib/activity-motion';
 import { deleteActivity, getIncompleteActivity, putActivity } from '../lib/activity-db';
 import { syncActivity, syncPendingActivities } from '../lib/activity-sync';
 import { api, type ActivityTimelineEvent, type LiveActivity, type SocialActivity } from '../lib/api';
@@ -846,7 +846,7 @@ export function ActivityRecorder() {
       motionFallbackSteps: 0,
       stepSource: 'UNAVAILABLE',
       cadenceSpm: 0,
-      strideM: ({ WALK: 0.65, RUN: 1, HIKE: 0.62, RIDE: 0 })[selected],
+      strideM: defaultStrideM(selected),
       distanceSource: 'NONE',
       currentPaceSPerKm: null,
       currentSpeedKmh: null,
@@ -859,6 +859,10 @@ export function ActivityRecorder() {
       elevationGainM: 0,
       elevationLossM: 0,
       altitudeSamplesM: [],
+      lastElevationAt: null,
+      lastMetricUpdateAt: null,
+      pendingGpsDurationS: 0,
+      pendingGpsDisplacementM: 0,
       trackingMode: 'GPS_MOTION',
       gpsAvailable: undefined,
       gpsAccuracyM: null,
@@ -935,13 +939,15 @@ export function ActivityRecorder() {
       releaseWakeLock();
       const pausedAt = now();
       const activeElapsedS = elapsedSeconds(current);
-      persist(refreshActivityMetrics({ ...current, status: 'PAUSED', trackingMode: 'PAUSED', elapsedBeforePauseS: activeElapsedS, activeSince: null, lastMovementAt: null, currentPaceSPerKm: null, currentSpeedKmh: null, paceSource: null, recentPaceSegments: [], trackingDiagnostics: current.trackingDiagnostics ? { ...current.trackingDiagnostics, rollingPaceDistanceM: 0, rollingPaceDurationS: 0 } : current.trackingDiagnostics, updatedAt: pausedAt }, activeElapsedS));
+      persist(refreshActivityMetrics({ ...current, status: 'PAUSED', trackingMode: 'PAUSED', elapsedBeforePauseS: activeElapsedS, activeSince: null, lastMovementAt: null, currentPaceSPerKm: null, currentSpeedKmh: null, paceSource: null, recentPaceSegments: [], pendingGpsDurationS: 0, pendingGpsDisplacementM: 0, trackingDiagnostics: current.trackingDiagnostics ? { ...current.trackingDiagnostics, rollingPaceDistanceM: 0, rollingPaceDurationS: 0 } : current.trackingDiagnostics, updatedAt: pausedAt }, activeElapsedS, { movementConfirmed: false }));
       setGps('Recording paused.');
       setMotionMessage('Motion tracking paused.');
     } else {
-      void beginMotionSensors(current.type, true);
-      persist({ ...current, status: 'RECORDING', trackingMode: current.gpsAvailable ? 'GPS_MOTION' : 'MOTION_ONLY', activeSince: now(), lastMovementAt: null, updatedAt: now() });
+      const resumed = resumeActivityTracking(current, now());
+      persist(resumed);
       setGps('Reconnecting to GPS...');
+      beginWatch();
+      void beginMotionSensors(current.type, true);
     }
   }
 
@@ -983,7 +989,7 @@ export function ActivityRecorder() {
       liveEndStatus,
       timeline: completeTimeline(current, finalLive?.timeline, endedAt),
       updatedAt: endedAt,
-    }, activeElapsedS);
+    }, activeElapsedS, { forceAverage: true });
     persist(finished);
     setShortActivityWarning(false);
     setScreen('SUMMARY');
@@ -1108,17 +1114,17 @@ export function ActivityRecorder() {
   }
 
   const seconds = activity ? elapsed : 0;
-  const speed = activity ? averageSpeedKmh(activity.distanceM, seconds) : 0;
+  const metricSeconds = activity?.lastMetricUpdateAt ? elapsedSeconds(activity, Date.parse(activity.lastMetricUpdateAt)) : 0;
+  const speed = activity ? averageSpeedKmh(activity.distanceM, metricSeconds) : 0;
   const motionEstimateActive = Boolean(activity && (activity.motionFallbackDistanceM ?? 0) > 0);
-  const calculatedAveragePace = activity ? averagePaceSeconds(activity.type, activity.distanceM, seconds) : null;
+  const calculatedAveragePace = activity?.averagePaceSPerKm ?? null;
   const formattedAveragePace = formatPaceSeconds(calculatedAveragePace);
   const pace = motionEstimateActive && formattedAveragePace !== '--' ? `~${formattedAveragePace}` : formattedAveragePace;
   const averagePace = formatPaceSeconds(calculatedAveragePace);
-  const movingPace = formatPaceSeconds(activity ? averageMovingPaceSeconds(activity.type, activity.distanceM, activity.movingTimeS ?? 0) : null);
-  const elevationGainM = Math.min(activity?.elevationGainM ?? 0, (activity?.distanceM ?? 0) * 0.45);
+  const movingPace = formatPaceSeconds(activity?.averageMovingPaceSPerKm ?? null);
   const altitudeAccuracyM = activity?.trackingDiagnostics?.lastAltitudeAccuracyM;
-  const elevationReliable = activity?.currentElevationM !== null && activity?.currentElevationM !== undefined && altitudeAccuracyM !== null && altitudeAccuracyM !== undefined && altitudeAccuracyM <= 20;
-  const elevation = elevationReliable ? `${Math.max(0, Math.round(elevationGainM))} m` : '--';
+  const elevationReliable = activity?.currentElevationM !== null && activity?.currentElevationM !== undefined && Boolean(activity?.lastElevationAt);
+  const elevation = elevationReliable ? formatSignedElevation(activity?.currentElevationM) : '--';
   const distance = `${motionEstimateActive ? '~' : ''}${formatDistance(activity?.distanceM ?? 0)}`;
   const calories = `~${Math.round(activity?.caloriesKcal ?? 0)} kcal`;
   const nativeStepMode = activity?.stepSource === 'NATIVE';
@@ -1226,7 +1232,7 @@ export function ActivityRecorder() {
     </div>
     <section className="live-metrics-panel">
       <div className="live-primary-metrics"><span><small>Distance</small><strong>{distance}</strong></span><span><small>Duration</small><strong>{formatDuration(seconds)}</strong></span><span><small>{activity.type === 'RIDE' ? 'Average speed' : 'Average pace'}</small><strong>{activity.type === 'RIDE' ? (speed ? `${speed.toFixed(1)} km/h` : '-') : pace}</strong></span></div>
-      <div className="live-secondary-metrics"><span><small>{activity.type === 'RIDE' ? 'GPS samples' : nativeStepMode ? 'Device steps' : 'Estimated steps'}</small><strong>{activity.type === 'RIDE' ? activity.route.length : steps}</strong></span><span><small>Elevation gain</small><strong>{elevation}</strong></span><span><small>Estimated calories</small><strong>{calories}</strong></span></div>
+      <div className="live-secondary-metrics"><span><small>{activity.type === 'RIDE' ? 'GPS samples' : nativeStepMode ? 'Device steps' : 'Estimated steps'}</small><strong>{activity.type === 'RIDE' ? activity.route.length : steps}</strong></span><span><small>Elevation</small><strong>{elevation}</strong></span><span><small>Estimated calories</small><strong>{calories}</strong></span></div>
       <p className="tracking-source-line">{sourceLine}</p>
       <p className={`status ${gpsProblem ? 'warning' : ''}`} role="status">{gps}</p>
       {continuityWarning && <p className="status warning" role="status">{continuityWarning}</p>}
