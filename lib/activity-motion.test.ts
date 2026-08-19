@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   GPS_ACCURACY_LIMITS_M,
+  PHONE_WALK_REFERENCE,
   averagePaceSeconds,
+  defaultStrideM,
   detectStep,
   estimatedCalories,
   initialStepDetectorState,
   markGpsUnavailable,
   recordGpsSample,
   recordMotionSteps,
+  refreshActivityMetrics,
+  resumeActivityTracking,
 } from './activity-motion';
-import type { ActivityType, LocalActivity, RoutePoint } from './activity';
+import { formatSignedElevation, type ActivityType, type LocalActivity, type RoutePoint } from './activity';
 
 const METERS_PER_LONGITUDE_DEGREE = 111_194.9;
 
@@ -99,6 +103,12 @@ describe('browser motion detection', () => {
 });
 
 describe('authoritative GPS and fused metric pipeline', () => {
+  it('matches the supplied phone walking reference for steps and calories', () => {
+    const strideM = defaultStrideM('WALK');
+    expect(strideM * PHONE_WALK_REFERENCE.steps).toBeCloseTo(PHONE_WALK_REFERENCE.distanceM, 5);
+    expect(estimatedCalories('WALK', PHONE_WALK_REFERENCE.durationS, PHONE_WALK_REFERENCE.distanceM)).toBe(PHONE_WALK_REFERENCE.caloriesKcal);
+  });
+
   it('calculates 620 m over 1,429 s as approximately 38:25 /km', () => {
     const pace = averagePaceSeconds('WALK', 620, 1_429);
     expect(pace).toBeCloseTo(2_304.84, 1);
@@ -206,7 +216,7 @@ describe('authoritative GPS and fused metric pipeline', () => {
 
     const confirmedOutage = markGpsUnavailable(motionWhileAcquiring, '2026-08-08T10:00:07.000Z');
     const fallback = recordMotionSteps(confirmedOutage, 5, 100, '2026-08-08T10:00:10.000Z');
-    expect(fallback.motionFallbackDistanceM).toBeCloseTo(3.25, 5);
+    expect(fallback.motionFallbackDistanceM).toBeCloseTo(5 * defaultStrideM('WALK'), 5);
     expect(fallback.steps).toBe(5);
     expect(fallback.stepSource).toBe('BROWSER_ESTIMATED');
   });
@@ -216,27 +226,29 @@ describe('authoritative GPS and fused metric pipeline', () => {
     const moved = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
     const lost = markGpsUnavailable(moved, '2026-08-08T10:01:01.000Z');
     const fallback = recordMotionSteps(lost, 20, 100, '2026-08-08T10:01:13.000Z');
-    expect(fallback.motionFallbackDistanceM).toBeCloseTo(13, 5);
-    expect(fallback.distanceM).toBeCloseTo(78, 0);
+    const fallbackDistanceM = 20 * defaultStrideM('WALK');
+    expect(fallback.motionFallbackDistanceM).toBeCloseTo(fallbackDistanceM, 5);
+    expect(fallback.distanceM).toBeCloseTo(65 + fallbackDistanceM, 0);
     const recovered = recordGpsSample(fallback, pointAt(300, '2026-08-08T10:01:14.000Z')).activity;
     expect(recovered.distanceM).toBeCloseTo(fallback.distanceM, 5);
     expect(recovered.route.at(-1)?.startsNewSegment).toBe(true);
     const afterRecovery = recordGpsSample(recovered, pointAt(310, '2026-08-08T10:01:24.000Z')).activity;
-    expect(afterRecovery.distanceM).toBeCloseTo(88, 0);
+    expect(afterRecovery.distanceM).toBeCloseTo(75 + fallbackDistanceM, 0);
     expect(afterRecovery.gpsDistanceM).toBeCloseTo(75, 0);
   });
 
   it('does not double-count GPS-estimated and browser-motion steps', () => {
     const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
     const gps = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
-    expect(gps.gpsEstimatedSteps).toBe(100);
-    expect(gps.steps).toBe(100);
+    const gpsSteps = Math.floor(65 / defaultStrideM('WALK'));
+    expect(gps.gpsEstimatedSteps).toBe(gpsSteps);
+    expect(gps.steps).toBe(gpsSteps);
     const motionWhileGps = recordMotionSteps(gps, 20, 100, '2026-08-08T10:01:12.000Z');
     expect(motionWhileGps.browserMotionSteps).toBe(20);
-    expect(motionWhileGps.steps).toBe(100);
+    expect(motionWhileGps.steps).toBe(gpsSteps);
     expect(motionWhileGps.distanceM).toBeCloseTo(65, 0);
     const fallback = recordMotionSteps(markGpsUnavailable(motionWhileGps, '2026-08-08T10:01:13.000Z'), 10, 100, '2026-08-08T10:01:19.000Z');
-    expect(fallback.steps).toBe(110);
+    expect(fallback.steps).toBe(gpsSteps + 10);
     expect(fallback.motionFallbackSteps).toBe(10);
   });
 
@@ -244,14 +256,14 @@ describe('authoritative GPS and fused metric pipeline', () => {
     const nativeActivity = activity({ stepSource: 'NATIVE' });
     const first = recordGpsSample(nativeActivity, pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
     const gps = recordGpsSample(first, pointAt(65, '2026-08-08T10:01:00.000Z')).activity;
-    expect(gps.gpsEstimatedSteps).toBe(100);
+    expect(gps.gpsEstimatedSteps).toBe(Math.floor(65 / defaultStrideM('WALK')));
     expect(gps.steps).toBe(0);
     const native = recordMotionSteps(gps, 42, 100, '2026-08-08T10:01:25.000Z', 'NATIVE');
     expect(native.nativeSteps).toBe(42);
     expect(native.steps).toBe(42);
     expect(native.stepSource).toBe('NATIVE');
     const moreGps = recordGpsSample(native, pointAt(130, '2026-08-08T10:02:00.000Z')).activity;
-    expect(moreGps.gpsEstimatedSteps).toBe(200);
+    expect(moreGps.gpsEstimatedSteps).toBe(Math.floor(130 / defaultStrideM('WALK')));
     expect(moreGps.steps).toBe(42);
   });
 
@@ -262,6 +274,47 @@ describe('authoritative GPS and fused metric pipeline', () => {
     const stationary = recordGpsSample(moved, pointAt(50.5, '2026-08-08T10:01:20.000Z')).activity;
     expect(stationary.caloriesKcal).toBe(moved.caloriesKcal);
     expect(estimatedCalories('WALK', 0, 50)).toBe(0);
+  });
+
+  it('does not recalculate live average pace or calories when only time or sensor steps change', () => {
+    const first = recordGpsSample(activity({ stepSource: 'NATIVE' }), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const moved = recordGpsSample(first, pointAt(30, '2026-08-08T10:00:20.000Z')).activity;
+    expect(moved.averagePaceSPerKm).not.toBeNull();
+    const sensorOnly = recordMotionSteps(moved, 3, 100, '2026-08-08T10:00:25.000Z', 'NATIVE');
+    expect(sensorOnly.distanceM).toBe(moved.distanceM);
+    expect(sensorOnly.movingTimeS).toBe(moved.movingTimeS);
+    expect(sensorOnly.averagePaceSPerKm).toBe(moved.averagePaceSPerKm);
+    expect(sensorOnly.caloriesKcal).toBe(moved.caloriesKcal);
+  });
+
+  it('updates the live average at intervals and forces an exact final average', () => {
+    const base = activity({ distanceM: 100, gpsDistanceM: 100, movingTimeS: 60, updatedAt: '2026-08-08T10:01:00.000Z' });
+    const first = refreshActivityMetrics(base, 60);
+    expect(first.averagePaceSPerKm).toBe(600);
+    const tooSoon = refreshActivityMetrics({ ...first, distanceM: 110, gpsDistanceM: 110, updatedAt: '2026-08-08T10:01:05.000Z' }, 65);
+    expect(tooSoon.averagePaceSPerKm).toBe(600);
+    const final = refreshActivityMetrics({ ...tooSoon, status: 'FINISHED', updatedAt: '2026-08-08T10:01:10.000Z' }, 70, { forceAverage: true });
+    expect(final.averagePaceSPerKm).toBeCloseTo(636.36, 1);
+  });
+
+  it('excludes a stationary gap from moving time when GPS movement resumes', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const moved = recordGpsSample(first, pointAt(10, '2026-08-08T10:00:10.000Z')).activity;
+    const idle1 = recordGpsSample(moved, pointAt(10.5, '2026-08-08T10:00:20.000Z')).activity;
+    const idle2 = recordGpsSample(idle1, pointAt(10.4, '2026-08-08T10:00:30.000Z')).activity;
+    expect(idle2.movingTimeS).toBe(moved.movingTimeS);
+    const continued = recordGpsSample(idle2, pointAt(20, '2026-08-08T10:00:31.000Z')).activity;
+    expect(continued.distanceM).toBeCloseTo(20, 0);
+    expect(continued.movingTimeS).toBeCloseTo((moved.movingTimeS ?? 0) + 1, 1);
+  });
+
+  it('uses validated motion to retain a precise small-area GPS path', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const motion = recordMotionSteps({ ...first, gpsAvailable: true, trackingMode: 'GPS_MOTION' }, 3, 100, '2026-08-08T10:00:01.000Z');
+    const smallMove = recordGpsSample(motion, pointAt(2, '2026-08-08T10:00:02.000Z'));
+    expect(smallMove.reason).toBe('ACCEPTED');
+    expect(smallMove.activity.route).toHaveLength(2);
+    expect(smallMove.activity.distanceM).toBeCloseTo(2, 0);
   });
 
   it('ignores altitude when vertical accuracy is poor', () => {
@@ -289,6 +342,33 @@ describe('authoritative GPS and fused metric pipeline', () => {
     const climbed = recordGpsSample(altitude3, pointAt(80, '2026-08-08T10:01:00.000Z', { altitude: 130, altitudeAccuracy: null, accuracy: 5 })).activity;
     expect(climbed.trackingDiagnostics?.lastAltitudeAccuracyM).toBe(20);
     expect(climbed.elevationGainM).toBeGreaterThan(3);
+  });
+
+  it('shows filtered signed local elevation and updates it no faster than every five seconds', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z', { altitude: -4, altitudeAccuracy: 5 })).activity;
+    expect(first.currentElevationM).toBe(-4);
+    expect(formatSignedElevation(first.currentElevationM)).toBe('-4 m');
+    expect(formatSignedElevation(124)).toBe('+124 m');
+    const tooSoon = recordGpsSample(first, pointAt(0.5, '2026-08-08T10:00:02.000Z', { altitude: 8, altitudeAccuracy: 5 })).activity;
+    expect(tooSoon.currentElevationM).toBe(-4);
+    const later = recordGpsSample(tooSoon, pointAt(0.7, '2026-08-08T10:00:06.000Z', { altitude: -2, altitudeAccuracy: 5 })).activity;
+    expect(later.currentElevationM).not.toBeNull();
+    expect(later.elevationGainM ?? 0).toBe(0);
+  });
+
+  it('re-baselines GPS after resume without counting the pause gap or getting stuck', () => {
+    const first = recordGpsSample(activity(), pointAt(0, '2026-08-08T10:00:00.000Z')).activity;
+    const moved = recordGpsSample(first, pointAt(20, '2026-08-08T10:00:20.000Z')).activity;
+    const paused = { ...moved, status: 'PAUSED' as const, trackingMode: 'PAUSED' as const, activeSince: null };
+    const resumed = resumeActivityTracking(paused, '2026-08-08T10:01:00.000Z');
+    expect(resumed.gpsAvailable).toBeUndefined();
+    expect(resumed.locationBaseline).toBeNull();
+    const rebaseline = recordGpsSample(resumed, pointAt(100, '2026-08-08T10:01:01.000Z')).activity;
+    expect(rebaseline.distanceM).toBeCloseTo(moved.distanceM, 5);
+    expect(rebaseline.route.at(-1)?.startsNewSegment).toBe(true);
+    const continued = recordGpsSample(rebaseline, pointAt(110, '2026-08-08T10:01:11.000Z')).activity;
+    expect(continued.distanceM).toBeCloseTo(moved.distanceM + 10, 0);
+    expect(continued.gpsAvailable).toBe(true);
   });
 
   it('does not change any active metrics while paused', () => {
